@@ -1,0 +1,454 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Noto Sans SC', 'Inter', system-ui, -apple-system, sans-serif;
+  line-height: 1.6;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 浅色模式（游戏化明亮风格） */
+:root {
+  --bg-primary: #F8FAFC;
+  --bg-secondary: #EEF2FF;
+  --bg-card: #FFFFFF;
+  --bg-elevated: #FFFFFF;
+  --bg-tertiary: #F1F5F9;
+  --text-primary: #1E293B;
+  --text-secondary: #475569;
+  --text-muted: #94A3B8;
+  --border-color: #E2E8F0;
+  --border-light: #F1F5F9;
+
+  /* 游戏化配色 */
+  --accent-primary: #6366F1;
+  --accent-secondary: #8B5CF6;
+  --accent-gradient: linear-gradient(135deg, #6366F1 0%, #8B5CF6 50%, #EC4899 100%);
+  --accent-glow: rgba(99, 102, 241, 0.4);
+  --accent-soft: rgba(99, 102, 241, 0.1);
+
+  /* 状态色 */
+  --success-color: #10B981;
+  --success-soft: rgba(16, 185, 129, 0.1);
+  --warning-color: #F59E0B;
+  --warning-soft: rgba(245, 158, 11, 0.1);
+  --danger-color: #EF4444;
+  --danger-soft: rgba(239, 68, 68, 0.1);
+  --info-color: #3B82F6;
+  --info-soft: rgba(59, 130, 246, 0.1);
+
+  /* 难度色 */
+  --easy-color: #10B981;
+  --medium-color: #F59E0B;
+  --hard-color: #EF4444;
+  --extreme-color: #8B5CF6;
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-glow: 0 0 20px var(--accent-glow);
+
+  /* 圆角 */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+}
+
+/* 深色模式（暗夜游戏风格） */
+.dark {
+  --bg-primary: #0F172A;
+  --bg-secondary: #1E293B;
+  --bg-card: #1E293B;
+  --bg-elevated: #334155;
+  --bg-tertiary: #0F172A;
+  --text-primary: #F8FAFC;
+  --text-secondary: #CBD5E1;
+  --text-muted: #64748B;
+  --border-color: #334155;
+  --border-light: #1E293B;
+
+  /* 深色模式游戏化配色 */
+  --accent-primary: #818CF8;
+  --accent-secondary: #A78BFA;
+  --accent-gradient: linear-gradient(135deg, #6366F1 0%, #8B5CF6 50%, #C084FC 100%);
+  --accent-glow: rgba(129, 140, 248, 0.5);
+  --accent-soft: rgba(129, 140, 248, 0.15);
+
+  /* 状态色 */
+  --success-color: #34D399;
+  --success-soft: rgba(52, 211, 153, 0.15);
+  --warning-color: #FBBF24;
+  --warning-soft: rgba(251, 191, 36, 0.15);
+  --danger-color: #F87171;
+  --danger-soft: rgba(248, 113, 113, 0.15);
+  --info-color: #60A5FA;
+  --info-soft: rgba(96, 165, 250, 0.15);
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 10px 10px -5px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 30px var(--accent-glow);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* 游戏化滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--accent-primary);
+  border-radius: 4px;
+  opacity: 0.5;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-secondary);
+}
+
+/* 焦点样式 */
+:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* 选中样式 */
+::selection {
+  background: var(--accent-soft);
+  color: var(--text-primary);
+}
+
+/* ===== 游戏化动画 ===== */
+
+/* 淡入上浮 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s ease-out forwards;
+}
+
+/* 缩放进入 */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.3s ease-out forwards;
+}
+
+/* 淡入 */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+/* 滑入 */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.4s ease-out forwards;
+}
+
+/* 弹跳 */
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.animate-bounce {
+  animation: bounce 0.6s ease-in-out;
+}
+
+/* 发光脉冲 */
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 5px var(--accent-glow); }
+  50% { box-shadow: 0 0 20px var(--accent-glow), 0 0 30px var(--accent-glow); }
+}
+
+.animate-glow-pulse {
+  animation: glowPulse 2s ease-in-out infinite;
+}
+
+/* 渐变流动 */
+@keyframes gradientFlow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradientFlow 3s ease infinite;
+}
+
+/* 答案冲击波 */
+@keyframes answerImpact {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.answer-impact {
+  animation: answerImpact 0.5s ease-out;
+}
+
+/* 打字机光标闪烁 */
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.typewriter-cursor::after {
+  content: '|';
+  animation: blink 1s infinite;
+  color: var(--accent-primary);
+}
+
+/* 卡片悬停效果 */
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-xl);
+}
+
+/* 玻璃拟态效果 */
+.glass {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+}
+
+.dark .glass {
+  background: rgba(30, 41, 59, 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+}
+
+/* 发光边框 */
+.glow-border {
+  border: 2px solid transparent;
+  background: linear-gradient(var(--bg-card), var(--bg-card)) padding-box,
+              var(--accent-gradient) border-box;
+}
+
+/* 渐变背景块 */
+.gradient-bg {
+  background: var(--accent-gradient);
+}
+
+/* 抽拉滑入 */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.3s ease-out forwards;
+}
+
+/* 进度条动画 */
+@keyframes progressStripe {
+  0% { background-position: 1rem 0; }
+  100% { background-position: 0 0; }
+}
+
+.animate-progress-stripe {
+  background-image: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.15) 25%,
+    transparent 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.15) 75%,
+    transparent 75%,
+    transparent
+  );
+  background-size: 1rem 1rem;
+  animation: progressStripe 1s linear infinite;
+}
+
+/* 星级闪烁 */
+@keyframes starPop {
+  0% { transform: scale(0); opacity: 0; }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-star-pop {
+  animation: starPop 0.4s ease-out forwards;
+}
+
+/* 游戏按钮按下效果 */
+.game-button {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.game-button:active {
+  transform: scale(0.96);
+}
+
+.game-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.game-button:hover::before {
+  left: 100%;
+}
+
+/* 骨架屏加载 */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-tertiary) 25%, var(--bg-secondary) 50%, var(--bg-tertiary) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* 噪点纹理（用于暗色模式氛围） */
+.dark .noise-texture {
+  position: relative;
+}
+
+.dark .noise-texture::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  opacity: 0.03;
+  pointer-events: none;
+}
+
+/* 工具类 */
+.text-gradient {
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.bg-gradient {
+  background: var(--accent-gradient);
+}
+
+.border-gradient {
+  border: 2px solid transparent;
+  background: linear-gradient(var(--bg-card), var(--bg-card)) padding-box,
+              var(--accent-gradient) border-box;
+}
+
+.shadow-glow {
+  box-shadow: var(--shadow-glow);
+}
+
+/* 流动性背景 */
+.fluid-bg {
+  position: relative;
+  overflow: hidden;
+}
+
+.fluid-bg::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle at 30% 30%, var(--accent-soft) 0%, transparent 50%),
+              radial-gradient(circle at 70% 70%, var(--info-soft) 0%, transparent 50%);
+  animation: fluidMove 15s ease-in-out infinite;
+  z-index: -1;
+}
+
+@keyframes fluidMove {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  33% { transform: translate(2%, 2%) rotate(1deg); }
+  66% { transform: translate(-1%, 1%) rotate(-1deg); }
+}
