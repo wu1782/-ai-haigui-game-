@@ -11,6 +11,7 @@ export interface LeaderboardEntry {
   storyId?: string      // 相关故事ID
   storyTitle?: string   // 相关故事标题
   date: string          // 日期
+  createdAt?: string    // 原始时间戳（用于赛季筛选）
 }
 
 // 排行榜类型

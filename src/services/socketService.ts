@@ -29,6 +29,21 @@ class SocketService {
 
       this.socket.on('connect', () => {
         console.log('[Socket] Connected:', this.socket?.id)
+
+        // 补挂连接前已注册的业务事件，避免“先订阅后连接”丢监听
+        this.listeners.forEach((_callbacks, event) => {
+          if (!this.socketListeners.has(event)) {
+            this.socketListeners.set(event, new Set())
+          }
+          if (this.socketListeners.get(event)?.size === 0) {
+            const socketCallback = (...args: any[]) => {
+              this.notifyListeners(event, ...args)
+            }
+            this.socket?.on(event, socketCallback)
+            this.socketListeners.get(event)?.add(socketCallback)
+          }
+        })
+
         this.notifyListeners('reconnect')
         resolve()
       })

@@ -39,7 +39,7 @@ export interface UserStats {
 export interface UserSettings {
   soundEnabled: boolean   // 音效开关
   volume: number          // 音量 0-100
-  theme: 'dark' | 'light' // 主题
+  theme: 'dark' | 'light' | 'system' // 主题
   animationSpeed: 'normal' | 'fast' | 'instant' // 动画速度
 }
 

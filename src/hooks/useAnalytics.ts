@@ -2,7 +2,7 @@
  * 游戏数据分析 Hook
  * 收集和分析用户游戏数据
  */
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { STORAGE_KEYS } from '../constants'
 
 interface GameRecord {
@@ -33,6 +33,8 @@ interface GameAnalytics {
   averageTimePerGame: number
   playingTimeDistribution: number[]
   achievementProgress: Record<string, number>
+  isLoading?: boolean
+  refresh?: () => void
 }
 
 const DEFAULT_ANALYTICS: GameAnalytics = {

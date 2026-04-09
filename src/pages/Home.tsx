@@ -11,8 +11,10 @@ import { getUserStats } from '../data/userData'
 import { useAuth } from '../hooks/useAuth'
 import { getDailyChallenge, getDailyChallengeStory } from '../data/dailyChallenge'
 import FriendsDrawer from '../components/FriendsDrawer'
+import OnboardingGuide from '../components/OnboardingGuide'
 import { DIFFICULTY_CONFIG, STORAGE_KEYS } from '../constants'
-import { PageErrorState } from '../components'
+import { getOnboardingTaskState, canClaimOnboardingReward, claimOnboardingReward } from '../data/onboardingTasks'
+import { PageErrorState, StoryCardListSkeleton } from '../components'
 import { FadeIn, PageTransition } from '../components/PageTransition'
 import type { Difficulty } from '../constants'
 
@@ -144,6 +146,8 @@ function Home() {
   const [error, setError] = useState<string | null>(null)
   const [challenge, setChallenge] = useState<import('../data/dailyChallenge').DailyChallengeProgress | null>(null)
   const [challengeStory, setChallengeStory] = useState<import('../types/story').TStory | null>(null)
+  const [onboardingTasks, setOnboardingTasks] = useState(() => getOnboardingTaskState())
+  const [showOnboardingGuide, setShowOnboardingGuide] = useState(true)
   const itemsPerPage = 9
 
   // 搜索和筛选状态
@@ -160,6 +164,11 @@ function Home() {
       setChallengeStory(s)
     }
     loadChallenge()
+  }, [])
+
+  // 刷新新手任务状态
+  useEffect(() => {
+    setOnboardingTasks(getOnboardingTaskState())
   }, [])
 
   // 模拟加载
@@ -211,6 +220,7 @@ function Home() {
   }, [sortType, playedIds, searchQuery, selectedDifficulties])
 
   const hotStories = useMemo(() => getStoriesByHot().slice(0, 5), [])
+  const onboardingCompletedCount = [onboardingTasks.firstGameStarted, onboardingTasks.firstQuestionAsked, onboardingTasks.firstGameWon].filter(Boolean).length
 
   // 分页计算
   const totalPages = Math.ceil(filteredStories.length / itemsPerPage)
@@ -401,6 +411,42 @@ function Home() {
             </div>
           </div>
         </div>
+
+        {/* 新手任务 */}
+        <section className="mb-6">
+          <div className="bg-white/80 dark:bg-dark-800/80 backdrop-blur-xl rounded-2xl border border-gray-200/50 dark:border-dark-700/50 p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+              <div>
+                <h3 className="text-gray-900 dark:text-white font-bold">新手任务</h3>
+                <p className="text-xs text-gray-500">完成 3 个入门目标，领取新手奖励</p>
+              </div>
+              <span className="text-sm font-semibold text-game-500">{onboardingCompletedCount}/3</span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
+              {[
+                { label: '开始首局游戏', done: onboardingTasks.firstGameStarted },
+                { label: '提出第一个问题', done: onboardingTasks.firstQuestionAsked },
+                { label: '完成并胜利一局', done: onboardingTasks.firstGameWon }
+              ].map(item => (
+                <div key={item.label} className={`px-3 py-2 rounded-lg border text-sm ${item.done ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500' : 'bg-gray-50 dark:bg-dark-900 border-gray-200 dark:border-dark-700 text-gray-500'}`}>
+                  {item.done ? '✓' : '○'} {item.label}
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => {
+                const result = claimOnboardingReward()
+                setOnboardingTasks(result.state)
+              }}
+              disabled={!canClaimOnboardingReward(onboardingTasks)}
+              className="px-4 py-2 bg-gradient-to-r from-game-500 to-purple-500 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl text-sm font-semibold disabled:cursor-not-allowed"
+            >
+              {onboardingTasks.rewardClaimed ? '奖励已领取' : `领取新手奖励 +${onboardingTasks.rewardPoints}`}
+            </button>
+          </div>
+        </section>
 
         {/* 每日挑战 + 用户状态 - 整合设计 */}
         {(() => {
@@ -836,6 +882,13 @@ function Home() {
           </p>
         </footer>
       </main>
+
+      {showOnboardingGuide && (
+        <OnboardingGuide onComplete={() => {
+          setShowOnboardingGuide(false)
+          setOnboardingTasks(getOnboardingTaskState())
+        }} />
+      )}
 
       {/* 好友抽屉 */}
       <FriendsDrawer isOpen={showFriendsDrawer} onClose={() => setShowFriendsDrawer(false)} />

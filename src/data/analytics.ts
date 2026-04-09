@@ -1,8 +1,6 @@
 // 游戏统计分析 - 追踪玩家行为数据
 // 用于分析热门问题、失败率、难度统计等
 
-import type { GameRecord } from '../types/game'
-import { STORAGE_KEYS } from '../constants'
 
 /**
  * 问题分析数据结构
@@ -126,7 +124,7 @@ export function recordGameQuestions(
   storyId: string,
   questions: Array<{ question: string; answer: string }>,
   isWin: boolean,
-  endType: 'guess' | 'giveup' | 'timeout'
+  _endType: 'guess' | 'giveup' | 'timeout'
 ): void {
   const analytics = getAnalyticsData()
 
@@ -144,8 +142,6 @@ export function recordGameQuestions(
   // 更新问题统计
   questions.forEach((item, index) => {
     const normalizedQ = normalizeQuestion(item.question)
-    const dimension = getQuestionDimension(item.question)
-
     if (!questionStats[normalizedQ]) {
       questionStats[normalizedQ] = {
         question: item.question,
@@ -228,9 +224,6 @@ export function getHardestStories(limit: number = 5): StoryFailureStats[] {
  * 获取各难度统计
  */
 export function getDifficultyStats(): DifficultyStats[] {
-  const analytics = getAnalyticsData()
-  const records = (analytics.recentRecords || []) as GameRecord[]
-
   const statsByDifficulty: Record<string, DifficultyStats> = {
     easy: { difficulty: 'easy', totalPlays: 0, winCount: 0, winRate: 0, avgQuestions: 0, avgTime: 0 },
     medium: { difficulty: 'medium', totalPlays: 0, winCount: 0, winRate: 0, avgQuestions: 0, avgTime: 0 },
@@ -262,7 +255,7 @@ export function getDimensionDistribution(): Record<string, number> {
  * 获取推荐问题（基于热门和当前位置）
  */
 export function getRecommendedQuestions(
-  currentDimension: string,
+  _currentDimension: string,
   askedDimensions: string[],
   limit: number = 5
 ): string[] {

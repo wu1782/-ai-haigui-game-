@@ -8,6 +8,7 @@ import { useVoice } from '../hooks/useVoice'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { saveReplay } from '../data/replays'
 import { completeDailyChallenge } from '../data/dailyChallenge'
+import { markFirstGameStarted, markFirstQuestionAsked, markGameFinished } from '../data/onboardingTasks'
 import { PageTransition } from '../components/PageTransition'
 import { GameSkeleton } from '../components'
 import { validateQuestion } from '../utils/validation'
@@ -386,7 +387,7 @@ function Game() {
   const [showInvite, setShowInvite] = useState(false)
 
   // 语音输入状态
-  const { transcript: voiceTranscript } = useVoice()
+  const { transcript: voiceTranscript, isListening } = useVoice()
 
   // 键盘快捷键
   useKeyboardShortcuts({
@@ -422,6 +423,7 @@ function Game() {
     if (story && !isInitializing) {
       setStartTime(Date.now())
       setElapsedTime(0)
+      markFirstGameStarted()
     }
   }, [story, isInitializing])
 
@@ -536,6 +538,7 @@ function Game() {
     }
 
     const question = validation.sanitized!
+    markFirstQuestionAsked()
     setError(null)
     setShowHint(false)
     setCurrentHint(null)
@@ -589,6 +592,8 @@ function Game() {
               isWin: true,
               endType: 'guess'
             })
+
+            markGameFinished(true)
 
             saveReplay({
               storyId: story.id,
@@ -660,6 +665,7 @@ function Game() {
         isWin: false,
         endType: 'giveup'
       })
+      markGameFinished(false)
       saveReplay({
         storyId: story.id,
         story,
@@ -679,6 +685,7 @@ function Game() {
   // 猜答案
   const handleGuess = () => {
     if (story) {
+      markGameFinished(true)
       saveGameRecord({
         storyId: story.id,
         playedAt: new Date().toISOString(),

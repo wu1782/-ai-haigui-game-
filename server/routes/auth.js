@@ -2,7 +2,7 @@ import express from 'express'
 import bcrypt from 'bcrypt'
 import { v4 as uuidv4 } from 'uuid'
 import db from '../db/sqlite.js'
-import { generateToken, generateRefreshToken, verifyRefreshToken, authMiddleware, setTokenCookie, clearTokenCookie, createSession, verifyRefreshTokenWithSession, updateSessionLastActive, revokeSession, revokeAllUserSessions, getUserSessions, getTokenFromRequest, getJwtSecret } from '../middleware/auth.js'
+import { generateToken, generateRefreshToken, authMiddleware, setTokenCookie, clearTokenCookie, createSession, verifyRefreshTokenWithSession, updateSessionLastActive, rotateSessionRefreshToken, revokeSession, revokeAllUserSessions, getUserSessions, getTokenFromRequest, getJwtSecret } from '../middleware/auth.js'
 import { asyncHandler } from '../middleware/errorHandler.js'
 import {
   validateBody,
@@ -142,16 +142,19 @@ router.post('/register', validateBody(registerSchema), asyncHandler(async (req, 
     console.error('[Auth] Failed to send verification email:', err.message)
   })
 
-  // 创建会话
-  const token = generateToken(userId)
-  const refreshToken = generateRefreshToken(userId)
+  // 创建会话（先创建session，再签发绑定sessionId的token）
+  const tempRefreshToken = generateRefreshToken(userId, null)
   const sessionId = createSession({
     userId,
-    refreshToken,
+    refreshToken: tempRefreshToken,
     deviceInfo: req.body.deviceInfo || null,
     ipAddress: req.ip || req.connection?.remoteAddress || null,
     userAgent: req.headers['user-agent'] || null
   })
+
+  const token = generateToken(userId, sessionId)
+  const refreshToken = generateRefreshToken(userId, sessionId)
+  rotateSessionRefreshToken(sessionId, refreshToken)
   setTokenCookie(res, token)
 
   res.status(201).json({
@@ -307,15 +310,18 @@ router.post('/login', validateBody(loginSchema), asyncHandler(async (req, res) =
   }
 
   // 生成 access token 和 refresh token，并创建会话
-  const token = generateToken(user.id)
-  const refreshToken = generateRefreshToken(user.id)
+  const tempRefreshToken = generateRefreshToken(user.id, null)
   const sessionId = createSession({
     userId: user.id,
-    refreshToken,
+    refreshToken: tempRefreshToken,
     deviceInfo: req.body.deviceInfo || null,
     ipAddress: req.ip || req.connection?.remoteAddress || null,
     userAgent: req.headers['user-agent'] || null
   })
+
+  const token = generateToken(user.id, sessionId)
+  const refreshToken = generateRefreshToken(user.id, sessionId)
+  rotateSessionRefreshToken(sessionId, refreshToken)
   setTokenCookie(res, token)
 
   res.json({
@@ -362,12 +368,13 @@ router.post('/refresh', asyncHandler(async (req, res) => {
     })
   }
 
-  // 更新会话活跃时间
-  updateSessionLastActive(decoded.sessionId)
-
   // 生成新的 access token 和 refresh token（保持同一会话）
   const newToken = generateToken(decoded.userId, decoded.sessionId)
   const newRefreshToken = generateRefreshToken(decoded.userId, decoded.sessionId)
+
+  // 刷新时轮换会话中的 refreshToken 哈希
+  rotateSessionRefreshToken(decoded.sessionId, newRefreshToken)
+  updateSessionLastActive(decoded.sessionId)
   setTokenCookie(res, newToken)
 
   res.json({
@@ -689,7 +696,7 @@ router.post('/verify', asyncHandler(async (req, res) => {
  * 重新发送验证邮件（需登录）
  */
 router.post('/send-verify-email', authMiddleware, asyncHandler(async (req, res) => {
-  const user = db.prepare('SELECT id, username, email FROM users WHERE id = ?').get(req.userId)
+  const user = db.prepare('SELECT id, username, email, emailVerified FROM users WHERE id = ?').get(req.userId)
 
   if (!user) {
     return res.status(404).json({
@@ -794,6 +801,9 @@ router.post('/reset-password', asyncHandler(async (req, res) => {
       code: 'NOT_FOUND'
     })
   }
+
+  // 密码重置后吊销用户所有会话，避免旧token继续可用
+  revokeAllUserSessions(decoded.odId)
 
   res.json({
     success: true,

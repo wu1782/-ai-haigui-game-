@@ -10,7 +10,7 @@ interface VoiceSettingsProps {
 }
 
 export const VoiceSettings = memo(function VoiceSettings({ isOpen, onClose }: VoiceSettingsProps) {
-  const { speak, stopSpeaking, isSpeaking, voiceReady, isSupported } = useVoice()
+  const { stopSpeaking, isSpeaking, voiceReady, isSupported } = useVoice()
 
   const [selectedVoice, setSelectedVoice] = useState<SpeechSynthesisVoice | null>(null)
   const [speechRate, setSpeechRate] = useState(1.0)

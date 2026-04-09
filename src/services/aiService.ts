@@ -45,9 +45,11 @@ export async function getAIResponse(
     }
 
     const data = await response.json()
+    const answer = data?.data?.answer ?? data?.answer ?? '无关'
+
     return {
-      answer: data.answer || '无关',
-      is_victory: data.answer === '已破案'
+      answer,
+      is_victory: answer === '已破案'
     }
   } catch (error) {
     console.error('AI判定失败:', error)
@@ -77,12 +79,14 @@ export async function generateStory(keywords: string[]): Promise<AIGeneratedStor
     }
 
     const data = await response.json()
+    const payload = data?.data ?? data ?? {}
+
     return {
-      title: data.title || '无标题',
-      surface: data.surface || '',
-      bottom: data.bottom || '',
-      difficulty: Math.min(5, Math.max(1, data.difficulty || 3)),
-      tags: Array.isArray(data.tags) ? data.tags : []
+      title: payload.title || '无标题',
+      surface: payload.surface || '',
+      bottom: payload.bottom || '',
+      difficulty: Math.min(5, Math.max(1, payload.difficulty || 3)),
+      tags: Array.isArray(payload.tags) ? payload.tags : []
     }
   } catch (error) {
     console.error('AI生成失败:', error)

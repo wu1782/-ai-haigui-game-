@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { getUserStats } from '../data/userData'
 import { ACHIEVEMENTS, RANKS } from '../types'
 import { PageTransition, FadeIn } from '../components/PageTransition'
-import { PageErrorState, AchievementCardSkeleton } from '../components'
 import { NoAchievementsEmpty, AllAchievementsUnlockedEmpty } from '../components/EmptyState'
 
 /**

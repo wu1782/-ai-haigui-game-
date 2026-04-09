@@ -67,6 +67,7 @@ export interface Contribution {
   status: StoryStatus
   rejectionReason?: string
   createdAt: string
+  contributorName?: string
 }
 
 // 故事排序类型

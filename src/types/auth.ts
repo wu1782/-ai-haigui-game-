@@ -23,6 +23,7 @@ export interface UserStats {
   achievements: string[]
   rank: number
   lastPlayedAt?: string
+  difficultyWins?: Record<string, number>
 }
 
 export interface AuthResponse {

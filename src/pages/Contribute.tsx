@@ -157,6 +157,10 @@ export default function Contribute() {
   const [contributions, setContributions] = useState<Contribution[]>([])
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
 
+  // UGC 激励最小版：创作者等级
+  const approvedCount = contributions.filter(c => c.status === 'approved').length
+  const contributionLevel = approvedCount >= 20 ? '传奇创作者' : approvedCount >= 10 ? '资深创作者' : approvedCount >= 5 ? '进阶创作者' : approvedCount >= 1 ? '新锐创作者' : '见习创作者'
+
   // React Hook Form
   const {
     register,
@@ -646,6 +650,19 @@ export default function Contribute() {
             <FadeIn>
               <div className="max-w-3xl mx-auto">
                 <div className="bg-white/80 dark:bg-dark-800/80 backdrop-blur-xl rounded-2xl border border-gray-200/50 dark:border-dark-700/50 p-6 shadow-lg">
+                  <div className="mb-5 p-4 rounded-xl border border-game-500/20 bg-gradient-to-r from-game-500/10 to-purple-500/10">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-gray-500 text-xs mb-1">创作者等级</div>
+                        <div className="text-white font-bold text-lg">{contributionLevel}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-gray-500 text-xs mb-1">累计采纳</div>
+                        <div className="text-emerald-400 font-bold text-2xl">{approvedCount}</div>
+                      </div>
+                    </div>
+                  </div>
+
                   <h2 className="text-gray-900 dark:text-white font-bold mb-6 flex items-center gap-2">
                     <Eye className="w-5 h-5" />
                     我的投稿记录

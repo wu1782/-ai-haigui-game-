@@ -3,7 +3,13 @@
 
 import jwt from 'jsonwebtoken'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production'
+const JWT_SECRET = process.env.JWT_SECRET
+
+if (process.env.NODE_ENV === 'production' && !JWT_SECRET) {
+  throw new Error('[Email] FATAL: JWT_SECRET is required in production')
+}
+
+const EFFECTIVE_JWT_SECRET = JWT_SECRET || 'dev-secret-change-in-production'
 
 // 邮件配置（nodemailer）
 let transporter = null
@@ -86,7 +92,7 @@ function buildResetPasswordHtml(username, resetUrl) {
  * @param {string} odId - 用户 odId
  */
 export async function sendVerificationEmail(to, username, odId) {
-  const token = jwt.sign({ odId, type: 'verify', to }, JWT_SECRET, { expiresIn: '24h' })
+  const token = jwt.sign({ odId, type: 'verify', to }, EFFECTIVE_JWT_SECRET, { expiresIn: '24h' })
   const baseUrl = process.env.APP_URL || 'http://localhost:5173'
   const verifyUrl = `${baseUrl}/auth/verify?token=${token}`
 
@@ -128,7 +134,7 @@ export async function sendVerificationEmail(to, username, odId) {
  * @param {string} odId - 用户 odId
  */
 export async function sendPasswordResetEmail(to, username, odId) {
-  const token = jwt.sign({ odId, type: 'reset', to }, JWT_SECRET, { expiresIn: '1h' })
+  const token = jwt.sign({ odId, type: 'reset', to }, EFFECTIVE_JWT_SECRET, { expiresIn: '1h' })
   const baseUrl = process.env.APP_URL || 'http://localhost:5173'
   const resetUrl = `${baseUrl}/auth/reset-password?token=${token}`
 
@@ -167,7 +173,7 @@ export async function sendPasswordResetEmail(to, username, odId) {
  */
 export function verifyEmailToken(token) {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET)
+    const decoded = jwt.verify(token, EFFECTIVE_JWT_SECRET)
     if (decoded.type !== 'verify') return null
     return decoded
   } catch {
@@ -180,7 +186,7 @@ export function verifyEmailToken(token) {
  */
 export function verifyResetToken(token) {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET)
+    const decoded = jwt.verify(token, EFFECTIVE_JWT_SECRET)
     if (decoded.type !== 'reset') return null
     return decoded
   } catch {

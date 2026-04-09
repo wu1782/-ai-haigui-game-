@@ -43,7 +43,8 @@ export const STORAGE_KEYS = {
   FAVORITES: 'turtle-soup-favorites',
   REPLAYS: 'turtle-soup-replays',
   DAILY_CHALLENGE: 'turtle-soup-daily',
-  STORY_RATINGS: 'turtle-soup-ratings'
+  STORY_RATINGS: 'turtle-soup-ratings',
+  ONBOARDING_TASKS: 'turtle-soup-onboarding-tasks'
 } as const
 
 // API 配置

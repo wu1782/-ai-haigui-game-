@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { getLeaderboard } from '../data/leaderboard'
 import { LEADERBOARD_CONFIGS } from '../types/leaderboard'
@@ -12,6 +12,7 @@ import { EmptyLeaderboard } from '../components/EmptyState'
  */
 function Leaderboard() {
   const [activeTab, setActiveTab] = useState<LeaderboardType>('fastest')
+  const [seasonType, setSeasonType] = useState<'weekly' | 'monthly'>('weekly')
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -32,6 +33,22 @@ function Leaderboard() {
   }, [activeTab, loadLeaderboard])
 
   const currentConfig = LEADERBOARD_CONFIGS.find(c => c.type === activeTab)!
+
+  const seasonFilteredData = useMemo(() => {
+    const now = Date.now()
+    const windowMs = seasonType === 'weekly' ? 7 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000
+
+    const filtered = leaderboardData
+      .filter(entry => {
+        if (!entry.createdAt) return true
+        const t = new Date(entry.createdAt).getTime()
+        if (Number.isNaN(t)) return true
+        return now - t <= windowMs
+      })
+      .map((entry, index) => ({ ...entry, rank: index + 1 }))
+
+    return filtered
+  }, [leaderboardData, seasonType])
 
   // 获取前三名样式
   const getRankStyle = (rank: number) => {
@@ -96,6 +113,34 @@ function Leaderboard() {
             </header>
           </FadeIn>
 
+          {/* 赛季切换 */}
+          <FadeIn delay={80}>
+            <div className="flex justify-center mb-4">
+              <div className="inline-flex items-center p-1 bg-white/80 dark:bg-dark-800/80 rounded-xl border border-gray-200/50 dark:border-dark-700/50">
+                <button
+                  onClick={() => setSeasonType('weekly')}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    seasonType === 'weekly'
+                      ? 'bg-gradient-to-r from-game-500 to-purple-600 text-white'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-700'
+                  }`}
+                >
+                  周榜
+                </button>
+                <button
+                  onClick={() => setSeasonType('monthly')}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    seasonType === 'monthly'
+                      ? 'bg-gradient-to-r from-game-500 to-purple-600 text-white'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-700'
+                  }`}
+                >
+                  月榜
+                </button>
+              </div>
+            </div>
+          </FadeIn>
+
           {/* 标签切换 */}
           <FadeIn delay={100}>
             <div className="flex flex-wrap justify-center gap-2 mb-8">
@@ -151,12 +196,12 @@ function Leaderboard() {
                   <LeaderboardItemSkeleton key={i} index={i} />
                 ))}
               </div>
-            ) : leaderboardData.length === 0 ? (
+            ) : seasonFilteredData.length === 0 ? (
               <div className="bg-white/80 dark:bg-dark-800/80 backdrop-blur-xl rounded-3xl border border-gray-200/50 dark:border-dark-700/50">
                 <EmptyLeaderboard onRefresh={() => loadLeaderboard(activeTab)} />
               </div>
             ) : (
-              leaderboardData.map((entry, index) => (
+              seasonFilteredData.map((entry, index) => (
                 <div
                   key={`${entry.rank}-${index}`}
                   className={`flex items-center gap-4 p-4 sm:p-5 rounded-2xl border transition-all duration-200

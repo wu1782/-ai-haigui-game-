@@ -179,10 +179,6 @@ app.get('/api/ready', async (req, res) => {
       }
     });
   } catch (error) {
-    if (redisClient) {
-      try { redisClient.disconnect(); } catch {}
-      redisClient = null;
-    }
     res.status(503).json({ status: 'not_ready', error: error.message });
   }
 });

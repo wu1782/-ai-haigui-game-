@@ -154,7 +154,7 @@ export const updateStatsAfterGame = (isWin: boolean, questionCount: number, diff
       stats.bestStreak = stats.currentStreak
     }
     // 记录难度通关次数
-    if (difficulty && stats.difficultyWins.hasOwnProperty(difficulty)) {
+    if (difficulty && Object.prototype.hasOwnProperty.call(stats.difficultyWins, difficulty)) {
       stats.difficultyWins[difficulty]++
     }
     if (questionCount <= 5) {

@@ -121,10 +121,10 @@ export function validateUsername(username: string): ValidationResult {
   const sanitized = username.trim()
 
   if (sanitized.length < 3) {
-    errors.push('用户名至少需要 3 个字符')
+    errors.push('用户名至少3个字符')
   }
   if (sanitized.length > 20) {
-    errors.push('用户名最多 20 个字符')
+    errors.push('用户名最多20个字符')
   }
   if (sanitized.length === 0) {
     errors.push('用户名不能为空')
@@ -180,7 +180,7 @@ export function validatePassword(password: string): ValidationResult {
   const errors: string[] = []
 
   if (password.length < 6) {
-    errors.push('密码至少需要 6 个字符')
+    errors.push('密码至少6个字符')
   }
   if (password.length > 50) {
     errors.push('密码最多 50 个字符')
@@ -242,10 +242,10 @@ export function validateStorySurface(surface: string): ValidationResult {
   const sanitized = surface.trim()
 
   if (sanitized.length < 10) {
-    errors.push('汤面描述至少需要 10 个字符')
+    errors.push('汤面描述至少10个字符')
   }
   if (sanitized.length > 500) {
-    errors.push('汤面描述最多 500 个字符')
+    errors.push('汤面描述最多500个字符')
   }
   if (sanitized.length === 0) {
     errors.push('汤面不能为空')
@@ -267,10 +267,10 @@ export function validateStoryBottom(bottom: string): ValidationResult {
   const sanitized = bottom.trim()
 
   if (sanitized.length < 10) {
-    errors.push('汤底真相至少需要 10 个字符')
+    errors.push('汤底真相至少10个字符')
   }
   if (sanitized.length > 1000) {
-    errors.push('汤底真相最多 1000 个字符')
+    errors.push('汤底真相最多1000个字符')
   }
   if (sanitized.length === 0) {
     errors.push('汤底不能为空')

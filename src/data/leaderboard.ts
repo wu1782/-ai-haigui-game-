@@ -24,6 +24,7 @@ export async function getLeaderboard(type: LeaderboardType): Promise<Leaderboard
       playerName: entry.username,
       value: entry.value,
       date: entry.createdAt ? new Date(entry.createdAt).toLocaleDateString() : '',
+      createdAt: entry.createdAt || undefined,
       storyTitle: entry.storyId || undefined
     }))
   } catch (error) {

@@ -3,6 +3,7 @@
  */
 import { useState, useEffect, useCallback } from 'react'
 import { ACHIEVEMENTS } from '../types/user'
+import type { Achievement } from '../types/user'
 
 interface AchievementToastProps {
   achievementId: string
@@ -26,7 +27,7 @@ export function AchievementToast({ achievementId, onDismiss, autoDismissMs = 500
   const [showParticles, setShowParticles] = useState(false)
   const [showFlash, setShowFlash] = useState(false)
 
-  const achievement = ACHIEVEMENTS.find(a => a.id === achievementId)
+  const achievement: Achievement | undefined = ACHIEVEMENTS.find(a => a.id === achievementId)
 
   useEffect(() => {
     if (!achievement) return
@@ -121,7 +122,7 @@ export function AchievementToast({ achievementId, onDismiss, autoDismissMs = 500
               <div className="relative">
                 <div className={`w-14 h-14 rounded-xl bg-gradient-to-br from-amber-400/30 to-orange-400/30 border border-amber-300/40 flex items-center justify-center text-2xl shadow-lg transition-all duration-500`}
                      style={{ transformStyle: 'preserve-3d', transform: isVisible ? 'rotateY(360deg)' : 'rotateY(0deg)' }}>
-                  {achievement.icon}
+                  {String(achievement.icon)}
                 </div>
                 {/* 环绕光环 */}
                 <div className="absolute inset-0 rounded-xl border-2 border-amber-300/50 animate-pulse" />
@@ -131,11 +132,6 @@ export function AchievementToast({ achievementId, onDismiss, autoDismissMs = 500
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-amber-100 text-xs font-medium">🏆 成就解锁</span>
-                  {'gold' in achievement && achievement.gold && (
-                    <span className="px-2 py-0.5 text-[10px] bg-yellow-400/30 text-yellow-200 rounded-full font-bold">
-                      金
-                    </span>
-                  )}
                 </div>
                 <div className="text-white font-bold text-base truncate">
                   {achievement.title}

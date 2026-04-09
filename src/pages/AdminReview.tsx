@@ -14,7 +14,7 @@ import {
   reviewStory,
   getReviewStats
 } from '../services/contributionService'
-import type { ContributionStory, StoryStatus } from '../types/story'
+import type { ContributionStory } from '../types/story'
 
 type FilterTab = 'pending' | 'approved' | 'rejected'
 
@@ -38,7 +38,7 @@ function AdminReview() {
   // 权限检查
   useEffect(() => {
     if (!isAuthenticated) {
-      showToast('请先登录', 'warning')
+      showToast('请先登录', 'info')
       navigate('/auth')
       return
     }

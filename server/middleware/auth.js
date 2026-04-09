@@ -78,6 +78,15 @@ export function updateSessionLastActive(sessionId) {
 }
 
 /**
+ * 轮换会话的 Refresh Token 哈希
+ */
+export function rotateSessionRefreshToken(sessionId, refreshToken) {
+  const refreshTokenHash = bcrypt.hashSync(refreshToken, 10)
+  db.prepare('UPDATE sessions SET refreshTokenHash = ?, lastActiveAt = ? WHERE id = ? AND revoked = 0')
+    .run(refreshTokenHash, new Date().toISOString(), sessionId)
+}
+
+/**
  * 验证 Refresh Token 并检查会话是否有效
  */
 export function verifyRefreshTokenWithSession(token) {

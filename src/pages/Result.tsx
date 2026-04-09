@@ -53,33 +53,39 @@ function Result() {
   const [dailyChallenge, setDailyChallenge] = useState<DailyChallengeProgress | null>(null)
   const [canClaim, setCanClaim] = useState(false)
 
-  if (!state) {
-    navigate('/')
-    return null
-  }
+  const story = state?.story
+  const questionCount = state?.questionCount ?? 0
+  const messages = state?.messages ?? []
+  const isWin = state?.isWin
+  const endType = state?.endType
+  const elapsedTime = state?.elapsedTime
 
-  const { story, questionCount, messages, isWin, endType, elapsedTime } = state
+  useEffect(() => {
+    if (!state) {
+      navigate('/')
+    }
+  }, [state, navigate])
 
   // 检查是否已评分
   useEffect(() => {
+    if (!story) return
     const existing = getStoryRating(story.id)
     if (existing) {
       setDifficultyRating(existing.difficulty)
       setEnjoyRating(existing.enjoyability)
       setHasRatedStory(true)
     }
-  }, [story.id])
+  }, [story])
 
   // 游戏结束时更新统计
   // 使用 ref 跟踪是否已执行，避免依赖数组问题
   const hasUpdatedStatsRef = useRef(false)
   useEffect(() => {
-    if (state && !hasUpdatedStatsRef.current) {
-      hasUpdatedStatsRef.current = true
-      const { stats, newAchievements: newAch } = updateStatsAfterGame(isWin || false, questionCount, story.difficulty)
-      setUserStats(stats)
-      setNewAchievements(newAch)
-    }
+    if (!state || !story || hasUpdatedStatsRef.current) return
+    hasUpdatedStatsRef.current = true
+    const { stats, newAchievements: newAch } = updateStatsAfterGame(isWin || false, questionCount, story.difficulty)
+    setUserStats(stats)
+    setNewAchievements(newAch)
   }, [state, isWin, questionCount, story])
 
   // 获取每日挑战状态
@@ -100,8 +106,9 @@ function Result() {
 
   // 提交排行榜（仅胜利时，且仅提交一次）
   useEffect(() => {
-    if (!state || !isWin || hasSubmittedLeaderboard || !user) return
+    if (!state || !story || !isWin || hasSubmittedLeaderboard || !user) return
 
+    const currentStory = story
     const submitToLeaderboard = async () => {
       setHasSubmittedLeaderboard(true)
 
@@ -111,7 +118,7 @@ function Result() {
           userId: user.id,
           username: user.username,
           value: questionCount,
-          storyId: story.id
+          storyId: currentStory.id
         })
 
         // 提交最快推理排行榜（如果有 elapsedTime）
@@ -120,7 +127,7 @@ function Result() {
             userId: user.id,
             username: user.username,
             value: elapsedTime,
-            storyId: story.id
+            storyId: currentStory.id
           })
         }
       } catch (error) {
@@ -132,6 +139,7 @@ function Result() {
   }, [state, isWin, hasSubmittedLeaderboard, user, questionCount, elapsedTime, story])
 
   const { showToast } = useToast()
+
   const currentRank = getCurrentRank(userStats)
 
   // 结束方式描述
@@ -151,7 +159,7 @@ function Result() {
   }, [])
 
   useEffect(() => {
-    if (!showBottom) return
+    if (!showBottom || !story) return
 
     const text = story.bottom
     let index = 0
@@ -166,7 +174,11 @@ function Result() {
     }, 25)
 
     return () => clearInterval(interval)
-  }, [showBottom, story.bottom])
+  }, [showBottom, story])
+
+  if (!state || !story) {
+    return null
+  }
 
   // 关键提问
   const valuableQuestions = messages
@@ -384,6 +396,32 @@ function Result() {
           </div>
         )}
 
+        {/* 复盘摘要 */}
+        <div className="bg-white/5 backdrop-blur-xl rounded-3xl border border-game-500/20 p-5 mb-5 animate-fade-up" style={{ animationDelay: '280ms' }}>
+          <h3 className="text-white font-bold mb-3 flex items-center gap-2">
+            <span>🧠</span>
+            <span>本局复盘</span>
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+            <div className="bg-dark-900/60 border border-white/10 rounded-xl p-3">
+              <div className="text-gray-500 mb-1">结束方式</div>
+              <div className="text-white font-semibold">{getEndTypeText()}</div>
+            </div>
+            <div className="bg-dark-900/60 border border-white/10 rounded-xl p-3">
+              <div className="text-gray-500 mb-1">提问效率</div>
+              <div className="text-white font-semibold">{questionCount <= 8 ? '高效推理' : questionCount <= 15 ? '稳健推进' : '可优化提问路径'}</div>
+            </div>
+            <div className="bg-dark-900/60 border border-white/10 rounded-xl p-3">
+              <div className="text-gray-500 mb-1">关键命中</div>
+              <div className="text-white font-semibold">{valuableQuestions.length} 次有效突破</div>
+            </div>
+            <div className="bg-dark-900/60 border border-white/10 rounded-xl p-3">
+              <div className="text-gray-500 mb-1">建议</div>
+              <div className="text-white font-semibold">{isWin ? '下一局尝试更少提问破案' : '优先缩小人物关系与动机范围'}</div>
+            </div>
+          </div>
+        </div>
+
         {/* 统计信息 */}
         <div className="grid grid-cols-4 gap-3 mb-5 animate-fade-up" style={{ animationDelay: '300ms' }}>
           {[
@@ -400,6 +438,27 @@ function Result() {
             </div>
           ))}
         </div>
+
+        {/* 每日挑战战报 */}
+        {dailyChallenge && (
+          <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-4 mb-5 border border-game-500/20 animate-fade-up" style={{ animationDelay: '315ms' }}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-white font-bold flex items-center gap-2">
+                <span>📘</span>
+                <span>每日挑战战报</span>
+              </div>
+              <span className={`text-xs px-2 py-1 rounded-full ${dailyChallenge.progress?.completed ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                {dailyChallenge.progress?.completed ? '已完成' : '进行中'}
+              </span>
+            </div>
+            <div className="text-sm text-gray-400">
+              今日题目：{dailyChallenge.storyId} · 奖励倍率 x{dailyChallenge.bonusMultiplier}
+            </div>
+            <div className="text-sm text-gray-400 mt-1">
+              当前进度：{dailyChallenge.progress?.questions ?? 0}/{dailyChallenge.maxQuestions} 问
+            </div>
+          </div>
+        )}
 
         {/* 每日挑战奖励领取 */}
         {(() => {
@@ -493,6 +552,7 @@ function Result() {
           </button>
           {showComments && <CommentList storyId={story.id} />}
         </div>
+
 
         {/* 新成就展示 */}
         {newAchievements.length > 0 && (
