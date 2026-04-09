@@ -12,8 +12,7 @@ import { useAuth } from '../hooks/useAuth'
 import { getDailyChallenge, getDailyChallengeStory } from '../data/dailyChallenge'
 import FriendsDrawer from '../components/FriendsDrawer'
 import { DIFFICULTY_CONFIG, STORAGE_KEYS } from '../constants'
-import { CaseFileCardSkeleton, StoryCardListSkeleton, PageErrorState } from '../components'
-import { NoStoriesEmpty } from '../components/EmptyState'
+import { PageErrorState } from '../components'
 import { FadeIn, PageTransition } from '../components/PageTransition'
 import type { Difficulty } from '../constants'
 
@@ -99,58 +98,6 @@ const CaseFileCard = memo(function CaseFileCard({ story, index, isPlayed }: { st
       {/* 悬停时的光环 */}
       <div className={`absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none bg-gradient-to-r ${theme.from} ${theme.to} -z-10 blur-md opacity-20`} />
     </button>
-  )
-})
-
-/**
- * 玩家等级卡
- */
-const PlayerLevelCard = memo(function PlayerLevelCard({ username, level, xp, nextLevelXp }: { username: string; level: number; xp: number; nextLevelXp: number }) {
-  const progress = Math.min((xp / nextLevelXp) * 100, 100)
-
-  return (
-    <div className="relative bg-gradient-to-br from-game-500/10 to-purple-500/10 dark:from-game-500/20 dark:to-purple-500/20 rounded-2xl border border-game-500/30 p-4 overflow-hidden">
-      {/* 背景装饰 */}
-      <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-game-500/20 to-transparent rounded-bl-full" />
-
-      <div className="relative flex items-center gap-4">
-        {/* 头像 */}
-        <div className="relative">
-          <Avatar username={username} size="lg" level={level} />
-          {/* 等级光环 */}
-          <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-game-400 to-purple-400 opacity-30 blur-sm -z-10" />
-        </div>
-
-        {/* 信息 */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="font-bold text-gray-900 dark:text-white">{username}</span>
-            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-gradient-to-r from-game-500 to-purple-500 text-white">
-              LV.{level}
-            </span>
-          </div>
-
-          {/* 经验值进度条 */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between text-[10px] text-gray-500">
-              <span className="flex items-center gap-1">
-                <span>✨</span> 经验值
-              </span>
-              <span>{xp} / {nextLevelXp}</span>
-            </div>
-            <div className="h-2 bg-gray-200 dark:bg-dark-700 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-game-500 to-purple-500 rounded-full transition-all duration-500 relative overflow-hidden"
-                style={{ width: `${progress}%` }}
-              >
-                {/* 进度条光泽 */}
-                <div className="absolute inset-0 bg-gradient-to-b from-white/30 to-transparent" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
   )
 })
 

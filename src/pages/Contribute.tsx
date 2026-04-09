@@ -68,18 +68,18 @@ async function polishWithAI(surface: string): Promise<string> {
   }
 
   // 替换平淡词汇为更有悬念的表达
-  const enhancements: [string, string][] = [
-    [/很安静/gi, '异常安静'],
-    [/出现了/gi, '突然出现了'],
-    [/发生了/gi, '诡异的事情发生了'],
-    [/有人/gi, '一个神秘的人'],
-    [/看到了/gi, '似乎看到了'],
-    [/听到了/gi, '隐约听到了'],
+  const enhancements: [string, RegExp, string][] = [
+    ['很安静', /很安静/gi, '异常安静'],
+    ['出现了', /出现了/gi, '突然出现了'],
+    ['发生了', /发生了/gi, '诡异的事情发生了'],
+    ['有人', /有人/gi, '一个神秘的人'],
+    ['看到了', /看到了/gi, '似乎看到了'],
+    ['听到了', /听到了/gi, '隐约听到了'],
   ]
 
-  for (const [pattern, replacement] of enhancements) {
-    if (pattern.test(polished)) {
-      polished = polished.replace(pattern, replacement)
+  for (const [search, pattern] of enhancements) {
+    if (polished.includes(search)) {
+      polished = polished.replace(pattern, enhancements.find(([s]) => s === search)![2])
       break // 只做一处增强，避免过度修改
     }
   }
@@ -144,7 +144,7 @@ function PreviewCard({ title, surface, difficulty, tags }: PreviewCardProps) {
 export default function Contribute() {
   const navigate = useNavigate()
   const { showToast } = useToast()
-  const { user, isAuthenticated } = useAuth()
+  const { isAuthenticated } = useAuth()
 
   // Tab状态
   const [activeTab, setActiveTab] = useState<'write' | 'history'>('write')
@@ -187,7 +187,7 @@ export default function Contribute() {
   // 登录检查
   useEffect(() => {
     if (!isAuthenticated) {
-      showToast('请先登录后再投稿', 'warning')
+      showToast('请先登录后再投稿', 'info')
       navigate('/auth')
     }
   }, [isAuthenticated, navigate, showToast])
@@ -215,7 +215,7 @@ export default function Contribute() {
   const handlePolish = async () => {
     const surface = watchedValues.surface
     if (!surface || surface.length < 10) {
-      showToast('汤面至少需要10个字符才能润色', 'warning')
+      showToast('汤面至少需要10个字符才能润色', 'info')
       return
     }
 

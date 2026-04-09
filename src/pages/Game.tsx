@@ -167,7 +167,7 @@ const SurfaceCard = ({ surface, difficulty }: { surface: string; difficulty: str
 /**
  * 状态栏组件
  */
-const StatusBar = ({ time, count, onHelp, onInvite }: { time: string; count: number; onHelp: () => void; onInvite: () => void }) => (
+const StatusBar = ({ time, count, onHelp, onInvite, onBack }: { time: string; count: number; onHelp: () => void; onInvite: () => void; onBack: () => void }) => (
   <div className="flex items-center justify-between px-4 py-3 bg-dark-900 border-b border-dark-800">
     <div className="flex items-center gap-4">
       {/* Logo */}
@@ -223,7 +223,7 @@ const StatusBar = ({ time, count, onHelp, onInvite }: { time: string; count: num
           </svg>
         </button>
         <button
-          onClick={() => navigate('/')}
+          onClick={onBack}
           className="p-2 rounded-lg hover:bg-dark-800 transition-colors text-gray-500 hover:text-gray-300"
           title="返回"
         >
@@ -386,7 +386,7 @@ function Game() {
   const [showInvite, setShowInvite] = useState(false)
 
   // 语音输入状态
-  const { isListening, transcript: voiceTranscript, interimTranscript, startListening, stopListening, isSupported: voiceSupported } = useVoice()
+  const { transcript: voiceTranscript } = useVoice()
 
   // 键盘快捷键
   useKeyboardShortcuts({
@@ -743,6 +743,7 @@ function Game() {
         count={questionCount}
         onHelp={() => setShowHelp(true)}
         onInvite={() => setShowInvite(true)}
+        onBack={() => navigate('/')}
       />
 
       {/* 主内容 */}

@@ -22,7 +22,7 @@ function Generate() {
   // 登录检查
   useEffect(() => {
     if (!isAuthenticated) {
-      showToast('请先登录后使用 AI 生成', 'warning')
+      showToast('请先登录后使用 AI 生成', 'info')
       navigate('/auth')
     }
   }, [isAuthenticated, navigate, showToast])

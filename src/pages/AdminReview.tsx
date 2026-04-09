@@ -387,7 +387,7 @@ function AdminReview() {
                   </div>
 
                   {/* 关键词和标签 */}
-                  {(selectedStory.keywords?.length > 0 || selectedStory.tags?.length > 0) && (
+                  {((selectedStory.keywords?.length ?? 0) > 0 || (selectedStory.tags?.length ?? 0) > 0) && (
                     <div>
                       <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1 block">
                         关键词 / 标签

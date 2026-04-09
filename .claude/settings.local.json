@@ -32,7 +32,9 @@
       "Bash(D:\\\\Files\\\\Git\\\\bin\\\\bash.exe:*)",
       "Bash(node -c server/socket/gameHandler.js)",
       "WebFetch(domain:www.baidu.com)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "WebFetch(domain:vercel.com)",
+      "WebFetch(domain:ai-haigui-game-gvha1j3ss-wu1782s-projects.vercel.app)"
     ]
   }
 }
