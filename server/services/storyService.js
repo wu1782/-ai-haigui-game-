@@ -150,10 +150,13 @@ export async function updateStoryScore(storyId, increment = 1) {
 
 // AI生成故事并保存
 export async function saveAiGeneratedStory(storyData, creatorId = null) {
+  // 自动分类难度
+  const classifiedStory = classifyStoryDifficulty(storyData)
+
   if (Story) {
     try {
       const story = new Story({
-        ...storyData,
+        ...classifiedStory,
         isAiGenerated: true,
         creatorId,
         hotScore: 0,
@@ -167,4 +170,150 @@ export async function saveAiGeneratedStory(storyData, creatorId = null) {
   }
   // 非MongoDB模式，返回临时ID
   return `temp_${Date.now()}`
+}
+
+/**
+ * 自动分类故事难度
+ * 基于故事复杂度、答案特异性、逻辑依赖进行评估
+ */
+export function classifyStoryDifficulty(storyData) {
+  const { surface, bottom, starLevel } = storyData
+
+  // 如果已有星级难度，可以直接转换
+  if (starLevel) {
+    return {
+      ...storyData,
+      difficulty: starLevelToDifficulty(starLevel)
+    }
+  }
+
+  // 分析汤底复杂度
+  const complexity = analyzeStoryComplexity(surface, bottom)
+
+  // 分析答案特异性
+  const specificity = analyzeAnswerSpecificity(bottom)
+
+  // 分析逻辑依赖
+  const dependencies = analyzeLogicalDependencies(surface, bottom)
+
+  // 综合评分 (1-5)
+  let difficultyScore = 1
+
+  // 基础分
+  difficultyScore += complexity * 0.5
+  difficultyScore += specificity * 0.3
+  difficultyScore += dependencies * 0.2
+
+  // 四舍五入到最近的整数，范围1-5
+  difficultyScore = Math.round(Math.min(5, Math.max(1, difficultyScore)))
+
+  return {
+    ...storyData,
+    difficulty: starLevelToDifficulty(difficultyScore),
+    complexityScore: complexity,
+    autoClassified: true
+  }
+}
+
+/**
+ * 星级难度转换为标准难度等级
+ */
+function starLevelToDifficulty(starLevel) {
+  if (starLevel <= 1) return 'easy'
+  if (starLevel === 2) return 'medium'
+  if (starLevel === 3) return 'hard'
+  return 'extreme'
+}
+
+/**
+ * 分析故事复杂度
+ * 返回 0-4 的分数
+ */
+function analyzeStoryComplexity(surface, bottom) {
+  let score = 0
+
+  // 文本长度因素
+  const surfaceLength = (surface || '').length
+  const bottomLength = (bottom || '').length
+
+  if (surfaceLength > 100) score += 0.5
+  if (bottomLength > 150) score += 0.5
+
+  // 人物数量（通过关键词检测）
+  const personKeywords = ['他', '她', '他们', '妻子', '丈夫', '父亲', '母亲', '哥哥', '姐姐', '儿子', '女儿', '老板', '员工', '医生', '护士', '警察', '小偷']
+  const personCount = personKeywords.filter(kw => (bottom || '').includes(kw)).length
+  if (personCount >= 3) score += 1
+  else if (personCount >= 2) score += 0.5
+
+  // 关键事件数量
+  const eventKeywords = ['死亡', '谋杀', '自杀', '发现', '发生', '杀死', '伤害', '偷窃', '欺骗', '隐藏']
+  const eventCount = eventKeywords.filter(kw => (bottom || '').includes(kw)).length
+  if (eventCount >= 2) score += 1
+  else if (eventCount >= 1) score += 0.5
+
+  // 因果关系复杂度
+  if ((bottom || '').includes('为了') && (bottom || '').includes('所以')) score += 0.5
+  if ((bottom || '').includes('然而') || (bottom || '').includes('但是')) score += 0.5
+
+  return Math.min(4, score)
+}
+
+/**
+ * 分析答案特异性
+ * 返回 0-4 的分数
+ * 特异性越高（越具体），难度越低，因为玩家更容易确认
+ */
+function analyzeAnswerSpecificity(bottom) {
+  let score = 0
+  const bottomText = bottom || ''
+
+  // 非常具体的答案反而容易（玩家可以直接确认）
+  // 非常模糊的答案反而难（玩家无法确认）
+  const vagueWords = ['某种', '某些', '可能', '也许', '不确定', '不知道']
+  const specificWords = ['就是', '因为', '所以', '于是', '结果是']
+
+  const vagueCount = vagueWords.filter(w => bottomText.includes(w)).length
+  const specificCount = specificWords.filter(w => bottomText.includes(w)).length
+
+  score += specificCount * 0.5  // 具体词多=容易
+  score += vagueCount * 0.3     // 模糊词多=难
+
+  // 字数过少（信息不足）
+  if (bottomText.length < 30) score += 1
+
+  // 字数过多（信息复杂）
+  if (bottomText.length > 200) score += 0.5
+
+  return Math.min(4, score)
+}
+
+/**
+ * 分析逻辑依赖
+ * 返回 0-4 的分数
+ * 逻辑链越长、依赖越多，难度越高
+ */
+function analyzeLogicalDependencies(surface, bottom) {
+  let score = 0
+  const bottomText = bottom || ''
+
+  // 检测条件句（需要满足条件才能推理）
+  const conditionalMarkers = ['如果', '只要', '除非', '必须', '才能']
+  const conditionalCount = conditionalMarkers.filter(m => bottomText.includes(m)).length
+  score += conditionalCount * 0.5
+
+  // 检测转折点数量（推理链中的跳跃）
+  const turnMarkers = ['但是', '然而', '没想到', '出人意料', '结果却']
+  const turnCount = turnMarkers.filter(m => bottomText.includes(m)).length
+  score += turnCount * 0.8
+
+  // 检测反讽/意外元素
+  const ironyMarkers = ['讽刺', '可笑', '荒谬', '可笑的是', '意外']
+  const ironyCount = ironyMarkers.filter(m => bottomText.includes(m)).length
+  score += ironyCount * 0.6
+
+  // 时间悖论或复杂时间线
+  if (bottomText.includes('之前') && bottomText.includes('之后')) score += 0.5
+  if (bottomText.includes('同一时间') || bottomText.includes('与此同时')) score += 0.3
+
+  return Math.min(4, score)
 }

@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la D:/ai-haigui-game/*.md)",
+      "Bash(dir D:\\\\ai-haigui-game\\\\*.md /b)",
+      "Bash(npx tsc:*)",
+      "Bash(D:/Files/Git/bin/bash.exe:*)",
+      "Bash(cmd:*)",
+      "Bash(npm install:*)",
+      "Bash(powershell:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(gh run:*)",
+      "Read(//d D:/**)",
+      "Bash(npm ls:*)",
+      "Bash(node -e \"console.log\\('bcrypt version:', require\\('bcrypt'\\)\\)\")",
+      "Bash(curl -s http://localhost:3001/api/health)",
+      "Bash(npm run:*)",
+      "Bash(node -c server/index.js)",
+      "Bash(node -c server/middleware/admin.js)",
+      "Bash(node -c server/routes/stories.js)",
+      "Bash(dir \"D:\\\\ai-haigui-game\\\\server\\\\routes\")",
+      "WebFetch(domain:github.com)",
+      "Bash(claude plugin:*)",
+      "Bash(SHELL=\"/d/Files/Git/bin/bash\" claude plugin:*)",
+      "Bash(/d/Files/Git/bin/bash:*)",
+      "Bash(cmd.exe:*)",
+      "Bash(npx vitest:*)",
+      "Bash(where bash:*)",
+      "Bash(where sh:*)",
+      "Bash(npx:*)",
+      "Bash(start chrome:*)",
+      "Bash(D:\\\\Files\\\\Git\\\\bin\\\\bash.exe:*)",
+      "Bash(node -c server/socket/gameHandler.js)",
+      "WebFetch(domain:www.baidu.com)",
+      "Bash(node:*)"
+    ]
+  }
+}

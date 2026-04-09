@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Navigate, Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { PageTransition } from '../components/PageTransition'
 
 export default function Auth() {
   const { isAuthenticated, isLoading, login, register } = useAuth()
@@ -17,14 +18,16 @@ export default function Auth() {
   // 如果已登录，重定向到首页
   if (isLoading) {
     return (
+      <PageTransition>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-game-50/30 to-purple-50/30 dark:from-dark-900 dark:via-dark-900 dark:to-dark-900 flex items-center justify-center">
         <div className="relative">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-game-500 to-purple-600 flex items-center justify-center text-3xl shadow-lg shadow-game-500/30 animate-pulse">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-game-500 to-purple-600 flex items-center justify-center text-3xl shadow-lg shadow-game-500/30 animate-pulse text-white">
             🐢
           </div>
           <div className="absolute -inset-4 rounded-3xl bg-gradient-to-r from-game-400 to-purple-400 opacity-30 blur-xl animate-pulse" />
         </div>
       </div>
+      </PageTransition>
     )
   }
 
@@ -79,6 +82,7 @@ export default function Auth() {
   }
 
   return (
+    <PageTransition>
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-game-50/30 to-purple-50/30 dark:from-dark-900 dark:via-game-900/20 dark:to-purple-900/20 flex items-center justify-center px-4 relative overflow-hidden">
       {/* 背景装饰 */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
@@ -112,13 +116,13 @@ export default function Auth() {
           <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-game-500/10 to-purple-500/10 rounded-bl-full rounded-tr-3xl" />
 
           {/* Tabs */}
-          <div className="relative flex mb-8 bg-gray-100 dark:bg-dark-700 rounded-2xl p-1.5">
+          <div className="relative flex mb-8 bg-gray-100 dark:bg-gray-700 rounded-2xl p-1.5">
             <button
               type="button"
               onClick={() => { setMode('login'); setError('') }}
               className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all duration-300 ${
                 mode === 'login'
-                  ? 'bg-white dark:bg-dark-600 text-gray-900 dark:text-white shadow-md'
+                  ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-md'
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
               }`}
             >
@@ -129,7 +133,7 @@ export default function Auth() {
               onClick={() => { setMode('register'); setError('') }}
               className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all duration-300 ${
                 mode === 'register'
-                  ? 'bg-white dark:bg-dark-600 text-gray-900 dark:text-white shadow-md'
+                  ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-md'
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
               }`}
             >
@@ -272,5 +276,6 @@ export default function Auth() {
         </div>
       </div>
     </div>
+    </PageTransition>
   )
 }

@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { TStory, TMessage } from '../types'
 import { updateStatsAfterGame, getUserStats, getCurrentRank } from '../data/userData'
 import { AchievementGrid } from '../components/AchievementBadge'
@@ -9,8 +9,11 @@ import CommentList from '../components/CommentList'
 import { rateStory, getStoryRating } from '../data/storyRatings'
 import { shareToWeibo, shareToClipboard } from '../utils/shareUtils'
 import { getStreakBonusText } from '../data/userData'
-import { claimDailyReward, canClaimDailyReward, getDailyChallenge } from '../data/dailyChallenge'
+import { claimDailyReward, canClaimDailyReward, getDailyChallenge, DailyChallengeProgress } from '../data/dailyChallenge'
 import { useToast } from '../context/ToastContext'
+import { saveLeaderboardEntry } from '../data/leaderboard'
+import { useAuth } from '../hooks/useAuth'
+import { PageTransition } from '../components/PageTransition'
 
 interface ResultState {
   story: TStory
@@ -33,6 +36,7 @@ function Result() {
   const location = useLocation()
   const navigate = useNavigate()
   const state = location.state as ResultState | null
+  const { user } = useAuth()
   const [showBottom, setShowBottom] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [displayedText, setDisplayedText] = useState('')
@@ -45,6 +49,9 @@ function Result() {
   const [showShareCard, setShowShareCard] = useState(false)
   const [showComments, setShowComments] = useState(false)
   const [showRewardClaimed, setShowRewardClaimed] = useState(false)
+  const [hasSubmittedLeaderboard, setHasSubmittedLeaderboard] = useState(false) // 防止重复提交
+  const [dailyChallenge, setDailyChallenge] = useState<DailyChallengeProgress | null>(null)
+  const [canClaim, setCanClaim] = useState(false)
 
   if (!state) {
     navigate('/')
@@ -64,17 +71,68 @@ function Result() {
   }, [story.id])
 
   // 游戏结束时更新统计
+  // 使用 ref 跟踪是否已执行，避免依赖数组问题
+  const hasUpdatedStatsRef = useRef(false)
   useEffect(() => {
-    if (state) {
-      const { stats, newAchievements: newAch } = updateStatsAfterGame(isWin || false, questionCount)
+    if (state && !hasUpdatedStatsRef.current) {
+      hasUpdatedStatsRef.current = true
+      const { stats, newAchievements: newAch } = updateStatsAfterGame(isWin || false, questionCount, story.difficulty)
       setUserStats(stats)
       setNewAchievements(newAch)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [state, isWin, questionCount, story])
 
-  const currentRank = getCurrentRank(userStats)
+  // 获取每日挑战状态
+  useEffect(() => {
+    if (!user) return
+
+    const fetchDailyChallenge = async () => {
+      const challenge = await getDailyChallenge()
+      setDailyChallenge(challenge)
+      if (challenge) {
+        const claimable = await canClaimDailyReward()
+        setCanClaim(claimable)
+      }
+    }
+
+    fetchDailyChallenge()
+  }, [user])
+
+  // 提交排行榜（仅胜利时，且仅提交一次）
+  useEffect(() => {
+    if (!state || !isWin || hasSubmittedLeaderboard || !user) return
+
+    const submitToLeaderboard = async () => {
+      setHasSubmittedLeaderboard(true)
+
+      try {
+        // 提交最少提问次数排行榜
+        await saveLeaderboardEntry('fewestQuestions', {
+          userId: user.id,
+          username: user.username,
+          value: questionCount,
+          storyId: story.id
+        })
+
+        // 提交最快推理排行榜（如果有 elapsedTime）
+        if (elapsedTime) {
+          await saveLeaderboardEntry('fastest', {
+            userId: user.id,
+            username: user.username,
+            value: elapsedTime,
+            storyId: story.id
+          })
+        }
+      } catch (error) {
+        console.error('提交排行榜失败:', error)
+      }
+    }
+
+    submitToLeaderboard()
+  }, [state, isWin, hasSubmittedLeaderboard, user, questionCount, elapsedTime, story])
+
   const { showToast } = useToast()
+  const currentRank = getCurrentRank(userStats)
 
   // 结束方式描述
   const getEndTypeText = () => {
@@ -144,6 +202,7 @@ function Result() {
   }
 
   return (
+    <PageTransition>
     <div className="min-h-screen bg-gradient-to-br from-dark-900 via-game-900/30 to-dark-900 relative overflow-hidden">
       {/* 背景光晕 */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
@@ -344,9 +403,7 @@ function Result() {
 
         {/* 每日挑战奖励领取 */}
         {(() => {
-          const daily = getDailyChallenge()
-          const canClaim = canClaimDailyReward()
-          if (!daily || !daily.completed || !isWin) return null
+          if (!dailyChallenge || !dailyChallenge.progress?.completed || !isWin) return null
           return (
             <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 backdrop-blur-xl rounded-2xl p-4 mb-5 border border-amber-500/30 animate-fade-up" style={{ animationDelay: '320ms' }}>
               <div className="flex items-center justify-between">
@@ -357,14 +414,15 @@ function Result() {
                   <div>
                     <div className="text-white font-bold">每日挑战</div>
                     <div className="text-gray-400 text-xs">
-                      挑战完成 · 奖励 x{daily.bonusMultiplier}
+                      挑战完成 · 奖励 x{dailyChallenge.bonusMultiplier}
                     </div>
                   </div>
                 </div>
                 {canClaim ? (
                   <button
-                    onClick={() => {
-                      claimDailyReward()
+                    onClick={async () => {
+                      await claimDailyReward()
+                      setCanClaim(false)
                       setShowRewardClaimed(true)
                     }}
                     className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold rounded-xl transition-all shadow-lg text-sm"
@@ -517,6 +575,7 @@ function Result() {
         )}
       </div>
     </div>
+    </PageTransition>
   )
 }
 

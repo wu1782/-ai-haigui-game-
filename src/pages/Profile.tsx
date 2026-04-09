@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import Avatar from '../components/Avatar'
+import { PageTransition } from '../components/PageTransition'
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024 // 2MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
@@ -106,6 +107,7 @@ export default function Profile() {
   }
 
   return (
+    <PageTransition>
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-game-50/20 to-purple-50/20 dark:from-dark-900 dark:via-game-900/10 dark:to-purple-900/10 relative overflow-hidden">
       {/* 背景装饰 */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
@@ -115,7 +117,7 @@ export default function Profile() {
 
       {/* 顶部导航 */}
       <header className="relative bg-white/80 dark:bg-dark-800/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-dark-700/50">
-        <div className="max-w-2xl mx-auto px-6 h-18 flex items-center justify-between">
+        <div className="max-w-2xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link to="/" className="group flex items-center gap-2 px-3 py-2 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-700 transition-colors">
               <span className="text-lg group-hover:-translate-x-1 transition-transform">←</span>
@@ -235,5 +237,6 @@ export default function Profile() {
         </div>
       </main>
     </div>
+    </PageTransition>
   )
 }

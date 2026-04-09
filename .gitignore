@@ -27,3 +27,8 @@ dist-ssr
 .env
 .env.local
 .env.production.local
+
+# Server environment files
+server/.env
+server/.env.local
+server/.env.production

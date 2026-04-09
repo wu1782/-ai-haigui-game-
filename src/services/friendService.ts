@@ -1,7 +1,7 @@
 /**
  * 好友服务 - 调用后端 API
  */
-import type { Friend, FriendRequest, UserSearchResult } from '../types/friend'
+import type { Friend, FriendRequest, UserSearchResult, PaginatedSearchResult } from '../types/friend'
 
 const FRIENDS_KEY = 'turtle-soup-friends'
 const REQUESTS_KEY = 'turtle-soup-friend-requests'
@@ -11,7 +11,7 @@ const REQUESTS_KEY = 'turtle-soup-friend-requests'
  */
 export async function getFriends(): Promise<Friend[]> {
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/friends`, {
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/v1/friends`, {
       method: 'GET',
       credentials: 'include'
     })
@@ -39,7 +39,7 @@ export async function getFriends(): Promise<Friend[]> {
  */
 export async function getFriendRequests(): Promise<{ received: FriendRequest[]; sent: FriendRequest[] }> {
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/friends/requests`, {
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/v1/friends/requests`, {
       method: 'GET',
       credentials: 'include'
     })
@@ -66,11 +66,15 @@ export async function getFriendRequests(): Promise<{ received: FriendRequest[]; 
 }
 
 /**
- * 搜索用户
+ * 搜索用户（支持分页）
  */
-export async function searchUsers(keyword: string): Promise<UserSearchResult[]> {
+export async function searchUsers(keyword: string, page = 1, limit = 20): Promise<PaginatedSearchResult> {
   const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
-  const url = `${baseUrl}/api/friends/search?keyword=${encodeURIComponent(keyword)}`
+  const params = new URLSearchParams()
+  if (keyword) params.set('keyword', keyword)
+  params.set('page', String(page))
+  params.set('limit', String(limit))
+  const url = `${baseUrl}/api/v1/friends/search?${params.toString()}`
   console.log('[FriendService] Searching:', url)
 
   try {
@@ -89,7 +93,10 @@ export async function searchUsers(keyword: string): Promise<UserSearchResult[]> 
       throw new Error(data.error || `搜索用户失败 (${response.status})`)
     }
 
-    return data.users || []
+    return {
+      users: data.users || [],
+      pagination: data.pagination || { page: 1, pages: 1, total: 0, hasMore: false }
+    }
   } catch (error) {
     console.error('搜索用户错误:', error)
     throw error // 让调用方处理错误
@@ -101,7 +108,7 @@ export async function searchUsers(keyword: string): Promise<UserSearchResult[]> 
  */
 export async function sendFriendRequest(toUserId: string): Promise<{ success: boolean; request?: FriendRequest; error?: string }> {
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/friends/request`, {
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/v1/friends/request`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -128,7 +135,7 @@ export async function sendFriendRequest(toUserId: string): Promise<{ success: bo
  */
 export async function acceptFriendRequest(requestId: string): Promise<{ success: boolean; friend?: Friend; error?: string }> {
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/friends/request/${requestId}/accept`, {
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/v1/friends/request/${requestId}/accept`, {
       method: 'POST',
       credentials: 'include'
     })
@@ -151,7 +158,7 @@ export async function acceptFriendRequest(requestId: string): Promise<{ success:
  */
 export async function rejectFriendRequest(requestId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/friends/request/${requestId}/reject`, {
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/v1/friends/request/${requestId}/reject`, {
       method: 'POST',
       credentials: 'include'
     })
@@ -174,7 +181,7 @@ export async function rejectFriendRequest(requestId: string): Promise<{ success:
  */
 export async function removeFriend(friendId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/friends/friend/${friendId}`, {
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/v1/friends/friend/${friendId}`, {
       method: 'DELETE',
       credentials: 'include'
     })
@@ -197,7 +204,7 @@ export async function removeFriend(friendId: string): Promise<{ success: boolean
  */
 export async function cancelFriendRequest(requestId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/friends/request/${requestId}`, {
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/v1/friends/request/${requestId}`, {
       method: 'DELETE',
       credentials: 'include'
     })

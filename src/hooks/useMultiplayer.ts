@@ -90,6 +90,60 @@ export function useMultiplayer(): UseMultiplayerReturn {
   const reconnectListenerRef = useRef<(() => void) | null>(null)
   const connectionPromiseRef = useRef<Promise<void> | null>(null)
   const reconnectAttemptsRef = useRef(0)
+  const isReconnectingRef = useRef(false)
+
+  // 使用 ref 存储 handlers，确保每次渲染引用一致
+  const handlersRef = useRef({
+    'player-joined': (data: any) => {
+      setRoom(prev => prev ? {
+        ...prev,
+        players: data.players
+      } : null)
+    },
+    'player-left': (data: any) => {
+      setRoom(prev => prev ? {
+        ...prev,
+        players: data.players,
+        hostId: data.newHostId
+      } : null)
+    },
+    'player-ready': (data: any) => {
+      setRoom(prev => prev ? {
+        ...prev,
+        players: data.players
+      } : null)
+    },
+    'game-started': (data: any) => {
+      setRoom(prev => prev ? {
+        ...prev,
+        players: data.players,
+        status: 'playing'
+      } : null)
+      setGameStatus('playing')
+      setCurrentPlayer(data.currentPlayer)
+      setMessages([])
+      setWinner(null)
+    },
+    'answer-question': (data: any) => {
+      setMessages(prev => [...prev, {
+        id: `msg-${Date.now()}`,
+        playerId: data.currentPlayer?.id,
+        playerName: data.currentPlayer?.name,
+        question: data.question,
+        answer: data.answer,
+        timestamp: Date.now()
+      }])
+      setCurrentPlayer(data.currentPlayer)
+    },
+    'game-over': (data: any) => {
+      setRoom(prev => prev ? {
+        ...prev,
+        status: 'finished'
+      } : null)
+      setGameStatus('finished')
+      setWinner(data.winner)
+    }
+  })
 
   // 连接
   const connect = useCallback(async () => {
@@ -104,10 +158,10 @@ export function useMultiplayer(): UseMultiplayerReturn {
       return connectionPromiseRef.current
     }
 
-    // 防止无限重连
+    // 手动调用 connect 时，重置重连计数器，允许重新尝试
     if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
-      setError('连接失败，请检查网络后重试')
-      return
+      reconnectAttemptsRef.current = 0
+      setError(null)
     }
 
     setIsConnecting(true)
@@ -119,29 +173,47 @@ export function useMultiplayer(): UseMultiplayerReturn {
         await socketService.connect()
         setIsConnected(true)
         reconnectAttemptsRef.current = 0
+        isReconnectingRef.current = false
 
         // 设置断开重连监听
         reconnectListenerRef.current = () => {
           setIsConnected(false)
+          // 防止多次触发重连
+          if (isReconnectingRef.current) return
+          isReconnectingRef.current = true
+
           // 先检查再自增，确保最多尝试MAX_RECONNECT_ATTEMPTS次
           if (reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
             reconnectAttemptsRef.current++
-            connect()
+            // 使用 setTimeout 避免闭包问题，确保拿到最新的 connect 函数
+            setTimeout(() => {
+              isReconnectingRef.current = false
+              connect()
+            }, 1000) // 1秒后退避重连
+          } else {
+            isReconnectingRef.current = false
+            setError('连接失败，请检查网络后刷新页面')
           }
         }
         socketService.on('reconnect', reconnectListenerRef.current)
       } catch (e) {
         setError(e instanceof Error ? e.message : '连接失败')
         setIsConnected(false)
+        reconnectAttemptsRef.current = 0
+        isReconnectingRef.current = false
+        connectionPromiseRef.current = null
         throw e
       } finally {
         setIsConnecting(false)
-        connectionPromiseRef.current = null
+        // 连接完成后清理 promise 引用，允许新的连接尝试
+        if (socketService.isConnected()) {
+          connectionPromiseRef.current = null
+        }
       }
     })()
 
     return connectionPromiseRef.current
-  }, [isConnected])
+  }, [])
 
   // 断开连接
   const disconnect = useCallback(() => {
@@ -152,9 +224,13 @@ export function useMultiplayer(): UseMultiplayerReturn {
     setGameStatus('waiting')
     setMessages([])
     setWinner(null)
+    reconnectAttemptsRef.current = 0 // 重置重连计数器
+    isReconnectingRef.current = false
+    connectionPromiseRef.current = null // 清理连接 promise
 
     if (reconnectListenerRef.current) {
       socketService.off('reconnect', reconnectListenerRef.current)
+      reconnectListenerRef.current = null
     }
   }, [])
 
@@ -266,48 +342,8 @@ export function useMultiplayer(): UseMultiplayerReturn {
 
   // 设置 Socket 事件监听
   useEffect(() => {
-    const handlers = {
-      'player-joined': (data: any) => {
-        setRoom(prev => prev ? {
-          ...prev,
-          players: data.players
-        } : null)
-      },
-      'player-left': (data: any) => {
-        setRoom(prev => prev ? {
-          ...prev,
-          players: data.players,
-          hostId: data.newHostId
-        } : null)
-      },
-      'player-ready': (data: any) => {
-        setRoom(prev => prev ? {
-          ...prev,
-          players: data.players
-        } : null)
-      },
-      'game-started': (data: any) => {
-        setGameStatus('playing')
-        setCurrentPlayer(data.currentPlayer)
-        setMessages([])
-        setWinner(null)
-      },
-      'answer-question': (data: any) => {
-        setMessages(prev => [...prev, {
-          id: `msg-${Date.now()}`,
-          playerId: data.playerId,
-          playerName: data.playerName,
-          question: data.question,
-          answer: data.answer,
-          timestamp: Date.now()
-        }])
-        setCurrentPlayer(data.currentPlayer)
-      },
-      'game-over': (data: any) => {
-        setGameStatus('finished')
-        setWinner(data.winner)
-      }
-    }
+    // 使用 ref 中的 handlers，确保引用一致
+    const handlers = handlersRef.current
 
     // 注册所有监听器
     Object.entries(handlers).forEach(([event, handler]) => {

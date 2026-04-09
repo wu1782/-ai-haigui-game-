@@ -14,6 +14,61 @@ export interface TStory {
   createdAt?: string       // 创建时间
 }
 
+// 故事状态
+export type StoryStatus = 'pending' | 'approved' | 'rejected'
+
+// 审核信息
+export interface ReviewInfo {
+  reviewedBy?: string
+  reviewedAt?: string
+  rejectionReason?: string
+}
+
+// 投稿故事（扩展 TStory）
+export interface ContributionStory extends Partial<TStory> {
+  id: string
+  title: string
+  surface: string
+  difficulty: 'easy' | 'medium' | 'hard' | 'extreme'
+  starLevel?: number
+  keywords?: string[]
+  tags?: string[]
+  hint?: string
+  status: StoryStatus
+  contributorId?: string
+  contributor?: {
+    id: string
+    username: string
+    avatar?: string
+  }
+  reviewInfo?: ReviewInfo
+  createdAt: string
+}
+
+// 投稿表单数据
+export interface ContributePayload {
+  title: string
+  surface: string
+  bottom: string
+  difficulty: 'easy' | 'medium' | 'hard' | 'extreme'
+  starLevel?: number
+  keywords?: string[]
+  tags?: string[]
+  hint?: string
+}
+
+// 单个投稿记录
+export interface Contribution {
+  id: string
+  title: string
+  surface: string
+  difficulty: 'easy' | 'medium' | 'hard' | 'extreme'
+  starLevel: number
+  status: StoryStatus
+  rejectionReason?: string
+  createdAt: string
+}
+
 // 故事排序类型
 export type StorySortType = 'latest' | 'hottest' | 'unplayed'
 

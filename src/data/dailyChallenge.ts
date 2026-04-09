@@ -1,101 +1,200 @@
 /**
- * 每日挑战数据层
+ * 每日挑战数据层 - 服务端验证
+ * 防止前端伪造挑战完成状态
  */
-import { STORAGE_KEYS } from '../constants'
-import { stories } from './stories'
+import { API_CONFIG } from '../constants'
 
-export interface DailyChallenge {
-  date: string  // YYYY-MM-DD
+export interface DailyChallengeProgress {
+  date: string
   storyId: string
   bonusMultiplier: number
+  maxQuestions: number
+  progress: {
+    status: 'in_progress' | 'completed' | 'give_up' | 'timeout' | 'failed'
+    questions: number
+    completed: boolean
+    won: boolean
+    startedAt: number
+  } | null
+}
+
+export interface DailyChallengeStartResult {
+  storyId: string
+  title: string
+  difficulty: string
+  surface: string
+  maxQuestions: number
+  bonusMultiplier: number
+  questions: number
+}
+
+export interface DailyChallengeCompleteResult {
+  eligible: boolean
+  bonusApplied: boolean
+  bonusMultiplier: number
+  reason: string
   completed: boolean
-  rewardClaimed: boolean
+  won: boolean
 }
 
-const DAILY_KEY = STORAGE_KEYS.DAILY_CHALLENGE || 'turtle-soup-daily'
+// 获取 API Base URL
+const getApiBaseUrl = () => {
+  const base = API_CONFIG.AI_JUDGE.replace('/ai/judge', '')
+  return base
+}
 
-/**
- * 获取今日日期字符串
- */
-function getTodayString(): string {
-  return new Date().toISOString().split('T')[0]
+const getApiUrl = (path: string) => {
+  return `${getApiBaseUrl()}${path}`
 }
 
 /**
- * 获取每日挑战
+ * 获取今日每日挑战信息
  */
-export function getDailyChallenge(): DailyChallenge | null {
+export async function getDailyChallenge(): Promise<DailyChallengeProgress | null> {
   try {
-    const saved = localStorage.getItem(DAILY_KEY)
-    const today = getTodayString()
-
-    if (saved) {
-      const challenge: DailyChallenge = JSON.parse(saved)
-      if (challenge.date === today) {
-        return challenge
-      }
+    const response = await fetch(getApiUrl('/daily-challenge'), {
+      credentials: 'include'
+    })
+    if (!response.ok) {
+      console.error('[DailyChallenge] Server error:', response.status, response.statusText)
+      return null
     }
-
-    // 生成新的每日挑战
-    const randomIndex = Math.floor(Math.random() * stories.length)
-    const newChallenge: DailyChallenge = {
-      date: today,
-      storyId: stories[randomIndex].id,
-      bonusMultiplier: 2.0,
-      completed: false,
-      rewardClaimed: false
+    const text = await response.text()
+    if (!text) {
+      return null
     }
-
-    localStorage.setItem(DAILY_KEY, JSON.stringify(newChallenge))
-    return newChallenge
-  } catch {
+    const data = JSON.parse(text)
+    if (!data.data || !data.data.available) {
+      return null
+    }
+    return data.data as DailyChallengeProgress
+  } catch (error) {
+    console.error('[DailyChallenge] Failed to get challenge:', error)
     return null
   }
 }
 
 /**
- * 完成每日挑战
+ * 开始每日挑战
  */
-export function completeDailyChallenge(): void {
-  const challenge = getDailyChallenge()
-  if (challenge && !challenge.completed) {
-    challenge.completed = true
-    localStorage.setItem(DAILY_KEY, JSON.stringify(challenge))
+export async function startDailyChallenge(): Promise<DailyChallengeStartResult | null> {
+  try {
+    const response = await fetch(getApiUrl('/daily-challenge/start'), {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' }
+    })
+    if (!response.ok) {
+      console.error('[DailyChallenge] Server error:', response.status, response.statusText)
+      return null
+    }
+    const text = await response.text()
+    if (!text) return null
+    const data = JSON.parse(text)
+    return data.data
+  } catch (error) {
+    console.error('[DailyChallenge] Failed to start challenge:', error)
+    return null
   }
 }
 
 /**
- * 领取奖励
+ * 完成每日挑战（游戏结束时调用）
  */
-export function claimDailyReward(): void {
-  const challenge = getDailyChallenge()
-  if (challenge && challenge.completed && !challenge.rewardClaimed) {
-    challenge.rewardClaimed = true
-    localStorage.setItem(DAILY_KEY, JSON.stringify(challenge))
+export async function completeDailyChallenge(
+  won: boolean,
+  questionCount: number
+): Promise<DailyChallengeCompleteResult | null> {
+  try {
+    const response = await fetch(getApiUrl('/daily-challenge/complete'), {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ won, questionCount })
+    })
+    if (!response.ok) {
+      console.error('[DailyChallenge] Server error:', response.status, response.statusText)
+      return null
+    }
+    const text = await response.text()
+    if (!text) return null
+    const data = JSON.parse(text)
+    return data.data
+  } catch (error) {
+    console.error('[DailyChallenge] Failed to complete challenge:', error)
+    return null
+  }
+}
+
+/**
+ * 获取每日挑战的故事（通过常规故事接口）
+ */
+export async function getDailyChallengeStory(): Promise<import('../types/story').TStory | null> {
+  const challenge = await getDailyChallenge()
+  if (!challenge) return null
+
+  try {
+    const response = await fetch(getApiUrl(`/stories/${challenge.storyId}`), {
+      credentials: 'include'
+    })
+    if (!response.ok) {
+      console.error('[DailyChallenge] Server error:', response.status, response.statusText)
+      return null
+    }
+    const text = await response.text()
+    if (!text) return null
+    const data = JSON.parse(text)
+    return data.data
+  } catch (error) {
+    console.error('[DailyChallenge] Failed to get story:', error)
+    return null
   }
 }
 
 /**
  * 检查是否有未完成的今日挑战
  */
-export function hasUncompletedDailyChallenge(): boolean {
-  const challenge = getDailyChallenge()
-  return challenge !== null && !challenge.completed
+export async function hasUncompletedDailyChallenge(): Promise<boolean> {
+  const challenge = await getDailyChallenge()
+  return challenge !== null && challenge.progress !== null && !challenge.progress.completed
 }
 
 /**
  * 检查是否可以领取奖励
  */
-export function canClaimDailyReward(): boolean {
-  const challenge = getDailyChallenge()
-  return challenge !== null && challenge.completed && !challenge.rewardClaimed
+export async function canClaimDailyReward(): Promise<boolean> {
+  const challenge = await getDailyChallenge()
+  return (
+    challenge !== null &&
+    challenge.progress !== null &&
+    challenge.progress.completed &&
+    challenge.progress.won
+  )
 }
 
 /**
- * 获取每日挑战的故事
+ * 领取每日挑战奖励
  */
-export function getDailyChallengeStory() {
-  const challenge = getDailyChallenge()
-  if (!challenge) return null
-  return stories.find(s => s.id === challenge.storyId) || null
+export async function claimDailyReward(): Promise<{ success: boolean; message: string }> {
+  try {
+    const response = await fetch(getApiUrl('/daily-challenge/claim'), {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' }
+    })
+    if (!response.ok) {
+      console.error('[DailyChallenge] Server error:', response.status, response.statusText)
+      return { success: false, message: '领取失败，请稍后重试' }
+    }
+    const text = await response.text()
+    if (!text) return { success: false, message: '领取失败，请稍后重试' }
+    const data = JSON.parse(text)
+    if (data.success || data.code === 0) {
+      return { success: true, message: '奖励领取成功！' }
+    }
+    return { success: false, message: data.message || '领取失败' }
+  } catch (error) {
+    console.error('[DailyChallenge] Failed to claim reward:', error)
+    return { success: false, message: '领取失败，请稍后重试' }
+  }
 }

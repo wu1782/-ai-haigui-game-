@@ -35,4 +35,16 @@ export interface UserSearchResult {
   hasReceivedRequest: boolean
 }
 
+export interface Pagination {
+  page: number
+  pages: number
+  total: number
+  hasMore: boolean
+}
+
+export interface PaginatedSearchResult {
+  users: UserSearchResult[]
+  pagination: Pagination
+}
+
 export type FriendTab = 'list' | 'requests' | 'search'

@@ -1,4 +1,4 @@
-// 语音识别与合成 Hook - 使用 Web Speech API
+// 语音识别与合成 Hook - 使用 Web Speech API (增强版)
 import { useState, useCallback, useEffect, useRef } from 'react'
 
 interface UseVoiceReturn {
@@ -13,7 +13,18 @@ interface UseVoiceReturn {
   stopSpeaking: () => void
   isSupported: boolean
   voiceReady: boolean
+  // 增强功能
+  continuousMode: boolean
+  setContinuousMode: (enabled: boolean) => void
+  audioLevel: number
+  retryCount: number
+  maxRetries: number
+  registerVoiceCommand: (command: string, callback: () => void) => void
+  unregisterVoiceCommand: (command: string) => void
 }
+
+// 语音命令类型
+type VoiceCommandCallback = () => void
 
 // 检查浏览器支持
 const checkSupport = (): { speechRecognition: boolean; speechSynthesis: boolean } => {
@@ -31,9 +42,17 @@ export function useVoice(): UseVoiceReturn {
   const [interimTranscript, setInterimTranscript] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [voiceReady, setVoiceReady] = useState(false)
+  const [continuousMode, setContinuousMode] = useState(false)
+  const [audioLevel, setAudioLevel] = useState(0)
+  const [retryCount, setRetryCount] = useState(0)
+  const maxRetries = 3
 
   const recognitionRef = useRef<any>(null)
   const supportRef = useRef(checkSupport())
+  const voiceCommandsRef = useRef<Map<string, VoiceCommandCallback>>(new Map())
+  const audioContextRef = useRef<any>(null)
+  const analyserRef = useRef<any>(null)
+  const animationFrameRef = useRef<number | null>(null)
 
   // 初始化语音合成声音
   useEffect(() => {
@@ -62,14 +81,46 @@ export function useVoice(): UseVoiceReturn {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     const recognition = new SpeechRecognition()
 
-    recognition.continuous = false
+    recognition.continuous = continuousMode
     recognition.interimResults = true
     recognition.lang = 'zh-CN'
     recognition.maxAlternatives = 1
 
+    // 声音级别监测
+    const setupAudioAnalysis = () => {
+      try {
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)()
+          const source = audioContextRef.current.createMediaStreamSource(stream)
+          analyserRef.current = audioContextRef.current.createAnalyser()
+          analyserRef.current.fftSize = 256
+          source.connect(analyserRef.current)
+
+          const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount)
+
+          const updateLevel = () => {
+            if (!analyserRef.current) return
+            analyserRef.current.getByteFrequencyData(dataArray)
+            const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length
+            setAudioLevel(Math.min(100, average * 1.5))
+            if (isListening) {
+              animationFrameRef.current = requestAnimationFrame(updateLevel)
+            }
+          }
+          updateLevel()
+        }).catch(() => {
+          // 麦克风权限被拒绝，静默处理
+        })
+      } catch {
+        // 浏览器不支持
+      }
+    }
+
     recognition.onstart = () => {
       setIsListening(true)
       setError(null)
+      setRetryCount(0)
+      setupAudioAnalysis()
     }
 
     recognition.onresult = (event: any) => {
@@ -80,6 +131,14 @@ export function useVoice(): UseVoiceReturn {
         const result = event.results[i]
         if (result.isFinal) {
           finalTranscript += result[0].transcript
+
+          // 检查语音命令
+          const transcriptLower = finalTranscript.toLowerCase()
+          voiceCommandsRef.current.forEach((callback, command) => {
+            if (transcriptLower.includes(command.toLowerCase())) {
+              callback()
+            }
+          })
         } else {
           interimTranscript += result[0].transcript
         }
@@ -105,16 +164,36 @@ export function useVoice(): UseVoiceReturn {
         case 'network':
           setError('网络错误，请检查网络连接')
           break
+        case 'aborted':
+          // 用户主动停止，不显示错误
+          break
         default:
           setError(`语音识别错误: ${event.error}`)
       }
 
-      setIsListening(false)
+      // 自动重试
+      if (event.error === 'no-speech' && retryCount < maxRetries) {
+        setRetryCount(prev => prev + 1)
+        setTimeout(() => {
+          try {
+            recognition.start()
+          } catch {
+            // 忽略
+          }
+        }, 1000)
+      } else {
+        setIsListening(false)
+        setAudioLevel(0)
+      }
     }
 
     recognition.onend = () => {
       setIsListening(false)
       setInterimTranscript('')
+      setAudioLevel(0)
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
+      }
     }
 
     recognitionRef.current = recognition
@@ -123,8 +202,21 @@ export function useVoice(): UseVoiceReturn {
       if (recognitionRef.current) {
         recognitionRef.current.abort()
       }
+      if (audioContextRef.current) {
+        audioContextRef.current.close()
+      }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
+      }
     }
-  }, [])
+  }, [continuousMode, retryCount])
+
+  // 更新连续模式
+  useEffect(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.continuous = continuousMode
+    }
+  }, [continuousMode])
 
   // 开始监听
   const startListening = useCallback(() => {
@@ -138,6 +230,7 @@ export function useVoice(): UseVoiceReturn {
     setTranscript('')
     setInterimTranscript('')
     setError(null)
+    setRetryCount(0)
 
     try {
       recognitionRef.current?.start()
@@ -158,7 +251,21 @@ export function useVoice(): UseVoiceReturn {
       recognitionRef.current.stop()
     }
     setIsListening(false)
+    setAudioLevel(0)
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current)
+    }
   }, [isListening])
+
+  // 注册语音命令
+  const registerVoiceCommand = useCallback((command: string, callback: VoiceCommandCallback) => {
+    voiceCommandsRef.current.set(command, callback)
+  }, [])
+
+  // 注销语音命令
+  const unregisterVoiceCommand = useCallback((command: string) => {
+    voiceCommandsRef.current.delete(command)
+  }, [])
 
   // 文字转语音
   const speak = useCallback((text: string) => {
@@ -219,6 +326,13 @@ export function useVoice(): UseVoiceReturn {
     speak,
     stopSpeaking,
     isSupported: supportRef.current.speechRecognition && supportRef.current.speechSynthesis,
-    voiceReady
+    voiceReady,
+    continuousMode,
+    setContinuousMode,
+    audioLevel,
+    retryCount,
+    maxRetries,
+    registerVoiceCommand,
+    unregisterVoiceCommand
   }
 }

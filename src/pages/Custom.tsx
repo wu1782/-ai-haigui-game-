@@ -1,29 +1,37 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useToast } from '../context/ToastContext'
+import { PageTransition, FadeIn } from '../components/PageTransition'
 
 /**
  * Custom - 私人录入页面 - 游戏化风格
  */
 function Custom() {
   const navigate = useNavigate()
+  const { showToast } = useToast()
   const [title, setTitle] = useState('')
   const [surface, setSurface] = useState('')
   const [bottom, setBottom] = useState('')
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard' | 'extreme'>('medium')
   const [generatedLink, setGeneratedLink] = useState('')
+  const [generatedStoryData, setGeneratedStoryData] = useState<object | null>(null) // 保存生成的故事数据
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
 
   const handleGenerate = () => {
     if (!surface.trim()) {
       setError('请输入汤面')
+      showToast('请输入汤面', 'error')
       return
     }
     if (!bottom.trim()) {
       setError('请输入汤底')
+      showToast('请输入汤底', 'error')
       return
     }
     setError('')
+    setIsGenerating(true)
 
     const storyData = {
       id: 'custom-' + Date.now(),
@@ -40,9 +48,16 @@ function Custom() {
     try {
       const encoded = btoa(encodeURIComponent(JSON.stringify(storyData)))
       const link = `${window.location.origin}/game/custom?data=${encoded}`
+      // 同时保存 storyData 到 state，确保 handlePlayNow 使用最新数据
       setGeneratedLink(link)
+      // 保存 storyData 以便立即游玩时使用
+      setGeneratedStoryData(storyData)
+      showToast('链接生成成功！', 'success')
     } catch (e) {
       setError('生成链接失败，请重试')
+      showToast('生成链接失败，请重试', 'error')
+    } finally {
+      setIsGenerating(false)
     }
   }
 
@@ -51,6 +66,7 @@ function Custom() {
     try {
       await navigator.clipboard.writeText(generatedLink)
       setCopied(true)
+      showToast('链接已复制到剪贴板', 'success')
       setTimeout(() => setCopied(false), 2000)
     } catch (e) {
       const textArea = document.createElement('textarea')
@@ -60,13 +76,21 @@ function Custom() {
       document.execCommand('copy')
       document.body.removeChild(textArea)
       setCopied(true)
+      showToast('链接已复制到剪贴板', 'success')
       setTimeout(() => setCopied(false), 2000)
     }
   }
 
   const handlePlayNow = () => {
-    if (!generatedLink) return
-    navigate('/game/custom?data=' + generatedLink.split('data=')[1])
+    // 优先使用最新生成的 storyData，如果没有则从 generatedLink 解析
+    if (generatedStoryData) {
+      const encoded = btoa(encodeURIComponent(JSON.stringify(generatedStoryData)))
+      showToast('开始游戏！', 'info')
+      navigate(`/game/custom?data=${encoded}`)
+    } else if (generatedLink) {
+      showToast('开始游戏！', 'info')
+      navigate('/game/custom?data=' + generatedLink.split('data=')[1])
+    }
   }
 
   const difficultyOptions = [
@@ -77,46 +101,52 @@ function Custom() {
   ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-game-50/20 to-purple-50/20 dark:from-dark-900 dark:via-game-900/10 dark:to-purple-900/10 relative overflow-hidden">
-      {/* 背景装饰 */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-game-500/10 to-purple-500/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-full blur-3xl" />
-      </div>
+    <PageTransition>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-game-50/20 to-purple-50/20 dark:from-dark-900 dark:via-game-900/10 dark:to-purple-900/10 relative overflow-hidden">
+        {/* 背景装饰 */}
+        <div className="fixed inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-game-500/10 to-purple-500/10 rounded-full blur-3xl" />
+          <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-full blur-3xl" />
+        </div>
 
-      {/* 主内容 */}
-      <div className="relative z-10 max-w-xl mx-auto px-6 py-8">
-        {/* 返回按钮 */}
-        <button
-          onClick={() => navigate('/')}
-          className="group flex items-center gap-2 px-4 py-2 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-700 transition-colors mb-6"
-        >
-          <span className="text-lg group-hover:-translate-x-1 transition-transform">←</span>
-          <span className="text-sm font-medium">返回大厅</span>
-        </button>
+        {/* 主内容 */}
+        <div className="relative z-10 max-w-xl mx-auto px-6 py-8">
+          {/* 返回按钮 */}
+          <FadeIn>
+            <button
+              onClick={() => navigate('/')}
+              className="group flex items-center gap-2 px-4 py-2 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-700 transition-colors mb-6"
+            >
+              <span className="text-lg group-hover:-translate-x-1 transition-transform">←</span>
+              <span className="text-sm font-medium">返回大厅</span>
+            </button>
+          </FadeIn>
 
-        {/* 页面标题 */}
-        <header className="text-center mb-8">
-          <div className="relative inline-flex items-center justify-center mb-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-game-500 to-purple-600 flex items-center justify-center text-3xl shadow-lg shadow-game-500/30">
-              📝
-            </div>
-            <div className="absolute -inset-4 rounded-3xl bg-gradient-to-r from-game-400 to-purple-400 opacity-30 blur-xl -z-10" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-            私人录入
-          </h1>
-          <p className="text-gray-500 dark:text-gray-400 text-sm">
-            输入你的汤面与汤底，生成专属链接分享给好友
-          </p>
-        </header>
+          {/* 页面标题 */}
+          <FadeIn delay={50}>
+            <header className="text-center mb-8">
+              <div className="relative inline-flex items-center justify-center mb-4">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-game-500 to-purple-600 flex items-center justify-center text-3xl shadow-lg shadow-game-500/30">
+                  📝
+                </div>
+                <div className="absolute -inset-4 rounded-3xl bg-gradient-to-r from-game-400 to-purple-400 opacity-30 blur-xl -z-10" />
+              </div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                私人录入
+              </h1>
+              <p className="text-gray-500 dark:text-gray-400 text-sm">
+                输入你的汤面与汤底，生成专属链接分享给好友
+              </p>
+            </header>
+          </FadeIn>
 
-        {/* 表单区域 */}
-        <div className="bg-white/80 dark:bg-dark-800/80 backdrop-blur-xl rounded-3xl border border-gray-200/50 dark:border-dark-700/50 p-6 mb-6 shadow-lg">
-          {/* 标题 */}
-          <div className="mb-5">
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-              标题 <span className="text-gray-400 text-xs">(选填)</span>
+          {/* 表单区域 */}
+          <FadeIn delay={100}>
+            <div className="bg-white/80 dark:bg-dark-800/80 backdrop-blur-xl rounded-3xl border border-gray-200/50 dark:border-dark-700/50 p-6 mb-6 shadow-lg">
+              {/* 标题 */}
+              <div className="mb-5">
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  标题 <span className="text-gray-400 text-xs">(选填)</span>
             </label>
             <input
               type="text"
@@ -185,14 +215,26 @@ function Custom() {
           {/* 生成按钮 */}
           <button
             onClick={handleGenerate}
+            disabled={isGenerating}
             className="w-full py-4 bg-gradient-to-r from-game-500 to-purple-600 hover:from-game-600 hover:to-purple-700
+                       disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none
                        text-white font-bold rounded-xl shadow-lg shadow-game-500/30
                        transition-all active:scale-[0.98] flex items-center justify-center gap-2"
           >
-            <span>🔗</span>
-            <span>生成分享链接</span>
+            {isGenerating ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>生成中...</span>
+              </>
+            ) : (
+              <>
+                <span>🔗</span>
+                <span>生成分享链接</span>
+              </>
+            )}
           </button>
         </div>
+          </FadeIn>
 
         {/* 分享链接区域 */}
         {generatedLink && (
@@ -236,28 +278,31 @@ function Custom() {
         )}
 
         {/* 提示信息 */}
-        <div className="bg-white/50 dark:bg-dark-800/50 backdrop-blur rounded-2xl p-5 border border-gray-200/50 dark:border-dark-700/50">
-          <h3 className="text-gray-900 dark:text-white text-sm font-bold mb-3 flex items-center gap-2">
-            <span className="text-xl">💡</span>
-            <span>温馨提示</span>
-          </h3>
-          <ul className="space-y-2 text-gray-600 dark:text-gray-400 text-sm">
-            <li className="flex items-start gap-2">
-              <span className="text-game-500 mt-0.5">—</span>
-              <span>汤面是你想让大家猜测的故事背景，越有趣越能勾起好奇心</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-game-500 mt-0.5">—</span>
-              <span>汤底是真相答案，玩家通过提问来还原真相</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-game-500 mt-0.5">—</span>
-              <span>好的海龟汤应该有逻辑自洽的答案，避免出现悖论</span>
-            </li>
-          </ul>
+          <FadeIn delay={300}>
+            <div className="bg-white/50 dark:bg-dark-800/50 backdrop-blur rounded-2xl p-5 border border-gray-200/50 dark:border-dark-700/50">
+              <h3 className="text-gray-900 dark:text-white text-sm font-bold mb-3 flex items-center gap-2">
+                <span className="text-xl">💡</span>
+                <span>温馨提示</span>
+              </h3>
+              <ul className="space-y-2 text-gray-600 dark:text-gray-400 text-sm">
+                <li className="flex items-start gap-2">
+                  <span className="text-game-500 mt-0.5">—</span>
+                  <span>汤面是你想让大家猜测的故事背景，越有趣越能勾起好奇心</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-game-500 mt-0.5">—</span>
+                  <span>汤底是真相答案，玩家通过提问来还原真相</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-game-500 mt-0.5">—</span>
+                  <span>好的海龟汤应该有逻辑自洽的答案，避免出现悖论</span>
+                </li>
+              </ul>
+            </div>
+          </FadeIn>
         </div>
       </div>
-    </div>
+    </PageTransition>
   )
 }
 

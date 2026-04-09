@@ -33,4 +33,15 @@ db.exec(`
   )
 `)
 
+// 初始化拉黑表
+db.exec(`
+  CREATE TABLE IF NOT EXISTS blocks (
+    id TEXT PRIMARY KEY,
+    blockerId TEXT NOT NULL,
+    blockedId TEXT NOT NULL,
+    createdAt TEXT NOT NULL,
+    UNIQUE(blockerId, blockedId)
+  )
+`)
+
 export default db

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { getReplayById, type GameReplay } from '../data/replays'
 import Message from '../components/Message'
 import type { TMessage } from '../types'
+import { PageTransition } from '../components/PageTransition'
 
 /**
  * 游戏回放页面 - 游戏化风格
@@ -99,6 +100,7 @@ export default function Replay() {
   ]
 
   return (
+    <PageTransition>
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-game-50/10 to-purple-50/10 dark:from-dark-900 dark:via-game-900/10 dark:to-purple-900/10 flex flex-col relative overflow-hidden">
       {/* 顶部栏 */}
       <header className="relative bg-white/80 dark:bg-dark-800/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-dark-700/50 px-6 py-4 shrink-0">
@@ -227,5 +229,6 @@ export default function Replay() {
         </div>
       </div>
     </div>
+    </PageTransition>
   )
 }

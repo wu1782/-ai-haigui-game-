@@ -4,7 +4,7 @@
  */
 import type { LeaderboardEntry, LeaderboardType } from '../types/leaderboard'
 
-const API_BASE = '/api/leaderboard'
+const API_BASE = '/api/v1/leaderboard'
 
 // 获取排行榜数据
 export async function getLeaderboard(type: LeaderboardType): Promise<LeaderboardEntry[]> {

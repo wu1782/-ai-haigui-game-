@@ -7,6 +7,7 @@ export interface User {
   username: string
   email: string
   avatar?: string  // Base64 格式的头像
+  role?: 'user' | 'admin'
   stats: UserStats
   createdAt?: string
 }

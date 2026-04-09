@@ -1,17 +1,20 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, memo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getStoryById } from '../data/stories'
-import Message from '../components/Message'
-import CluePanel from '../components/CluePanel'
 import { askAI, getAIHint } from '../api'
 import type { TMessage, TGameStatus, TStory, TMessageType, GameRecord } from '../types'
 import { useSound } from '../hooks/useSound'
+import { useVoice } from '../hooks/useVoice'
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { saveReplay } from '../data/replays'
-import { completeDailyChallenge, getDailyChallenge } from '../data/dailyChallenge'
+import { completeDailyChallenge } from '../data/dailyChallenge'
+import { PageTransition } from '../components/PageTransition'
+import { GameSkeleton } from '../components'
+import { validateQuestion } from '../utils/validation'
+import { useToast } from '../context/ToastContext'
 
 /**
  * 保存游戏记录到localStorage
- * 最多保留100条记录，超出后删除最旧的
  */
 const MAX_RECORDS = 100
 
@@ -19,10 +22,8 @@ const saveGameRecord = (record: GameRecord) => {
   try {
     const saved = localStorage.getItem('turtle-soup-records')
     const records: GameRecord[] = saved ? JSON.parse(saved) : []
-    // 移除同一故事的旧记录
     const filtered = records.filter(r => r.storyId !== record.storyId)
     filtered.push(record)
-    // 限制最大记录数（保留最新的100条）
     const trimmed = filtered.slice(-MAX_RECORDS)
     localStorage.setItem('turtle-soup-records', JSON.stringify(trimmed))
   } catch (e) {
@@ -31,37 +32,335 @@ const saveGameRecord = (record: GameRecord) => {
 }
 
 /**
- * 维度配置
+ * 消息气泡组件
  */
-const dimensionLabels: Record<string, { label: string; icon: string; color: string }> = {
-  '人物': { label: '人物', icon: '👤', color: 'text-blue-500' },
-  '物品': { label: '物品', icon: '📦', color: 'text-amber-500' },
-  '事件': { label: '事件', icon: '⚡', color: 'text-purple-500' },
-  '时间': { label: '时间', icon: '⏰', color: 'text-cyan-500' },
-  '原因': { label: '原因', icon: '❓', color: 'text-rose-500' },
-  '位置': { label: '位置', icon: '📍', color: 'text-emerald-500' },
-  '状态': { label: '状态', icon: '🔄', color: 'text-orange-500' },
-  '关系': { label: '关系', icon: '🔗', color: 'text-pink-500' },
-  '未知': { label: '其他', icon: '💡', color: 'text-gray-500' }
+const MessageBubble = memo(({ message }: { message: TMessage }) => {
+  const isUser = message.role === 'user'
+  const isLoading = message.status === 'loading'
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-4">
+        <div className="flex items-center gap-3 px-6 py-4 bg-dark-800 rounded-2xl border border-dark-700">
+          <div className="flex gap-1">
+            {[0, 1, 2].map(i => (
+              <div
+                key={i}
+                className="w-2 h-2 rounded-full bg-game-500 animate-bounce"
+                style={{ animationDelay: `${i * 150}ms` }}
+              />
+            ))}
+          </div>
+          <span className="text-game-400 text-sm">审讯中...</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (message.type === 'victory') {
+    return (
+      <div className="flex justify-center py-4">
+        <div className="text-center">
+          <div className="text-6xl mb-2 animate-bounce">🎉</div>
+          <p className="text-emerald-400 text-lg font-medium">{message.content}</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
+      {!isUser && (
+        <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold mr-2 bg-dark-800 border border-dark-700">
+          🐢
+        </div>
+      )}
+
+      <div className="max-w-[85%]">
+        {isUser ? (
+          <div className="bg-gradient-to-br from-game-500 to-purple-600 rounded-2xl rounded-br-md px-5 py-3 shadow-lg shadow-game-500/20">
+            <p className="text-white text-[15px] leading-relaxed">{message.content}</p>
+          </div>
+        ) : (
+          <div className="bg-dark-800 rounded-2xl rounded-bl-md px-5 py-3 border border-dark-700">
+            <p className="text-gray-300 text-[15px] leading-relaxed">{message.content}</p>
+          </div>
+        )}
+
+        {!isUser && message.type && message.type !== 'system' && message.type !== 'user' && (
+          <div className="flex items-center gap-2 mt-2">
+            <AnswerBadge type={message.type} />
+          </div>
+        )}
+      </div>
+
+      {isUser && (
+        <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold ml-2 bg-gradient-to-br from-rose-500 to-pink-500">
+          ?
+        </div>
+      )}
+    </div>
+  )
+})
+
+/**
+ * 答案徽章
+ */
+const AnswerBadge = ({ type }: { type: string }) => {
+  const config = {
+    is: { text: '是', bg: 'bg-emerald-500/20', textColor: 'text-emerald-400', border: 'border-emerald-500/30' },
+    no: { text: '否', bg: 'bg-red-500/20', textColor: 'text-red-400', border: 'border-red-500/30' },
+    irrelevant: { text: '无关', bg: 'bg-gray-500/20', textColor: 'text-gray-400', border: 'border-gray-500/30' }
+  }[type] || { text: type, bg: 'bg-gray-500/20', textColor: 'text-gray-400', border: 'border-gray-500/30' }
+
+  return (
+    <span className={`px-2.5 py-1 text-xs font-bold rounded-full ${config.bg} ${config.textColor} border ${config.border}`}>
+      {config.text}
+    </span>
+  )
 }
 
 /**
- * 难度徽章配置
+ * 汤面卡片组件
  */
-const difficultyConfig = {
-  easy: { label: '入门', bg: 'bg-emerald-100 dark:bg-emerald-500/20', text: 'text-emerald-600 dark:text-emerald-400', border: 'border-emerald-200 dark:border-emerald-500/30' },
-  medium: { label: '中等', bg: 'bg-amber-100 dark:bg-amber-500/20', text: 'text-amber-600 dark:text-amber-400', border: 'border-amber-200 dark:border-amber-500/30' },
-  hard: { label: '困难', bg: 'bg-red-100 dark:bg-red-500/20', text: 'text-red-600 dark:text-red-400', border: 'border-red-200 dark:border-red-500/30' },
-  extreme: { label: '极难', bg: 'bg-purple-100 dark:bg-purple-500/20', text: 'text-purple-600 dark:text-purple-400', border: 'border-purple-200 dark:border-purple-500/30' }
+const SurfaceCard = ({ surface, difficulty }: { surface: string; difficulty: string }) => {
+  const difficultyConfig = {
+    easy: { label: '入门', color: '#10B981' },
+    medium: { label: '中等', color: '#F59E0B' },
+    hard: { label: '困难', color: '#EF4444' },
+    extreme: { label: '极难', color: '#8B5CF6' }
+  }
+  const diff = difficultyConfig[difficulty as keyof typeof difficultyConfig] || difficultyConfig.medium
+
+  return (
+    <div className="relative">
+      {/* 装饰线条 */}
+      <div className="absolute -left-4 top-0 bottom-0 w-0.5 bg-gradient-to-b from-transparent via-game-500 to-transparent" />
+
+      <div className="bg-dark-800 rounded-xl p-4 border border-dark-700">
+        {/* 标签 */}
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-[10px] font-bold tracking-[0.2em] text-game-400 uppercase">Case File</span>
+          <span className="w-px h-3 bg-dark-600" />
+          <span className="text-[10px] font-bold tracking-[0.2em] uppercase" style={{ color: diff.color }}>{diff.label}</span>
+        </div>
+
+        {/* 汤面内容 */}
+        <p className="text-gray-100 text-[15px] leading-relaxed font-medium">
+          "{surface}"
+        </p>
+
+        {/* 底部装饰 */}
+        <div className="flex items-center gap-2 mt-4 pt-3 border-t border-dark-700">
+          <div className="flex gap-1">
+            <div className="w-2 h-2 rounded-full bg-game-500" />
+            <div className="w-2 h-2 rounded-full bg-game-500/50" />
+            <div className="w-2 h-2 rounded-full bg-game-500/20" />
+          </div>
+          <span className="text-[10px] text-gray-500 tracking-wider">RESTRICTED</span>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 /**
- * Game - 游戏页面 - 游戏化风格
+ * 状态栏组件
+ */
+const StatusBar = ({ time, count, onHelp, onInvite }: { time: string; count: number; onHelp: () => void; onInvite: () => void }) => (
+  <div className="flex items-center justify-between px-4 py-3 bg-dark-900 border-b border-dark-800">
+    <div className="flex items-center gap-4">
+      {/* Logo */}
+      <div className="flex items-center gap-2">
+        <div className="w-8 h-8 rounded-lg bg-dark-800 border border-dark-700 flex items-center justify-center">
+          <span className="text-sm">🐢</span>
+        </div>
+        <span className="text-white font-bold text-sm tracking-tight">海龟汤</span>
+      </div>
+    </div>
+
+    <div className="flex items-center gap-6">
+      {/* 计时器 */}
+      <div className="flex items-center gap-2">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-500">
+          <circle cx="12" cy="12" r="10" />
+          <polyline points="12 6 12 12 16 14" />
+        </svg>
+        <span className="text-gray-300 font-mono text-sm">{time}</span>
+      </div>
+
+      {/* 提问次数 */}
+      <div className="flex items-center gap-2">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-500">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        </svg>
+        <span className="text-gray-300 font-mono text-sm">{count} 次</span>
+      </div>
+
+      {/* 按钮组 */}
+      <div className="flex items-center gap-1">
+        <button
+          onClick={onInvite}
+          className="p-2 rounded-lg hover:bg-dark-800 transition-colors text-gray-500 hover:text-gray-300"
+          title="邀请"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+          </svg>
+        </button>
+        <button
+          onClick={onHelp}
+          className="p-2 rounded-lg hover:bg-dark-800 transition-colors text-gray-500 hover:text-gray-300"
+          title="帮助"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+        </button>
+        <button
+          onClick={() => navigate('/')}
+          className="p-2 rounded-lg hover:bg-dark-800 transition-colors text-gray-500 hover:text-gray-300"
+          title="返回"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+)
+
+/**
+ * 输入区域组件
+ */
+const InputArea = ({
+  value,
+  onChange,
+  onSubmit,
+  onGiveUp,
+  onGuess,
+  disabled,
+  isLoading
+}: {
+  value: string
+  onChange: (v: string) => void
+  onSubmit: () => void
+  onGiveUp: () => void
+  onGuess: () => void
+  disabled: boolean
+  isLoading: boolean
+}) => (
+  <div className="bg-dark-900 border-t border-dark-800 px-4 py-4">
+    <div className="max-w-3xl mx-auto">
+      {/* 输入框 */}
+      <div className="relative mb-4">
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && onSubmit()}
+          placeholder="输入你的问题..."
+          disabled={disabled}
+          className="w-full bg-dark-800 border border-dark-700 rounded-xl px-5 py-4 text-white placeholder-gray-500 text-[15px]
+                     focus:outline-none focus:border-game-500 focus:ring-1 focus:ring-game-500/50 transition-all
+                     disabled:opacity-50"
+        />
+
+        {/* 发送按钮 */}
+        <button
+          onClick={onSubmit}
+          disabled={!value.trim() || disabled || isLoading}
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-2.5 bg-game-500 hover:bg-game-600 disabled:bg-dark-700 disabled:cursor-not-allowed rounded-lg transition-all text-white"
+        >
+          {isLoading ? (
+            <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          ) : (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="22" y1="2" x2="11" y2="13" />
+              <polygon points="22 2 15 22 11 13 2 9 22 2" />
+            </svg>
+          )}
+        </button>
+      </div>
+
+      {/* 底部操作 */}
+      <div className="flex items-center justify-between">
+        <span className="text-gray-500 text-xs">按 Enter 发送</span>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={onGiveUp}
+            disabled={disabled}
+            className="flex items-center gap-1.5 text-gray-500 hover:text-red-400 text-xs transition-colors disabled:opacity-40"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+              <line x1="4" y1="22" x2="4" y2="15" />
+            </svg>
+            放弃
+          </button>
+          <button
+            onClick={onGuess}
+            disabled={disabled}
+            className="flex items-center gap-1.5 text-gray-500 hover:text-emerald-400 text-xs transition-colors disabled:opacity-40"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <circle cx="12" cy="12" r="6" />
+              <circle cx="12" cy="12" r="2" />
+            </svg>
+            猜答案
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)
+
+/**
+ * 弹窗组件
+ */
+const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode }) => {
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-md bg-dark-800 rounded-2xl border border-dark-700 shadow-2xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-dark-700">
+          <h3 className="text-white font-bold">{title}</h3>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-lg hover:bg-dark-700 text-gray-500 hover:text-gray-300 transition-colors"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <div className="p-5">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Game - 游戏页面
  */
 function Game() {
   const { storyId } = useParams<{ storyId: string }>()
   const navigate = useNavigate()
   const { playSound } = useSound()
+  const { showToast } = useToast()
 
   const [story, setStory] = useState<TStory | null>(null)
   const [messages, setMessages] = useState<TMessage[]>([])
@@ -73,13 +372,46 @@ function Game() {
   const [isInitializing, setIsInitializing] = useState(true)
   const [inputValue, setInputValue] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const confirmingRef = useRef(false)
 
   // AI辅助提示状态
   const [showHint, setShowHint] = useState(false)
   const [currentHint, setCurrentHint] = useState<{ hint: string; dimension: string } | null>(null)
   const [isHintLoading, setIsHintLoading] = useState(false)
-  const [hintError, setHintError] = useState<string | null>(null)
+
+  // 帮助弹窗
+  const [showHelp, setShowHelp] = useState(false)
+
+  // 邀请弹窗
+  const [showInvite, setShowInvite] = useState(false)
+
+  // 语音输入状态
+  const { isListening, transcript: voiceTranscript, interimTranscript, startListening, stopListening, isSupported: voiceSupported } = useVoice()
+
+  // 键盘快捷键
+  useKeyboardShortcuts({
+    shortcuts: [
+      {
+        key: '?',
+        shiftKey: true,
+        action: () => setShowHelp(prev => !prev),
+        description: '帮助',
+        scope: 'local' as const
+      },
+      {
+        key: 'Escape',
+        action: () => {
+          if (showHelp) setShowHelp(false)
+          else if (showHint) setShowHint(false)
+          else if (showConfirm) setShowConfirm(false)
+          else if (showInvite) setShowInvite(false)
+        },
+        description: '关闭弹窗',
+        scope: 'global' as const,
+        preventDefault: true
+      }
+    ]
+  })
 
   // 用时统计
   const [startTime, setStartTime] = useState<number>(0)
@@ -102,20 +434,20 @@ function Game() {
     return () => clearInterval(interval)
   }, [gameStatus, startTime])
 
+  // 语音识别结果处理
+  useEffect(() => {
+    if (voiceTranscript && !isListening) {
+      setInputValue(voiceTranscript)
+    }
+  }, [voiceTranscript, isListening])
+
   // 格式化时间
   const formatTime = (ms: number): string => {
     const seconds = Math.floor(ms / 1000)
     const minutes = Math.floor(seconds / 60)
     const remainingSeconds = seconds % 60
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`
   }
-
-  // 消息折叠
-  const [isHistoryCollapsed, setIsHistoryCollapsed] = useState(false)
-  const COLLAPSE_THRESHOLD = 5
-
-  // 线索笔记面板
-  const [isCluePanelOpen, setIsCluePanelOpen] = useState(false)
 
   // 获取故事
   useEffect(() => {
@@ -125,9 +457,9 @@ function Game() {
         try {
           const customStory = JSON.parse(decodeURIComponent(atob(data)))
           setStory(customStory)
-          setTimeout(() => setIsInitializing(false), 400)
+          setTimeout(() => setIsInitializing(false), 500)
           return
-        } catch (e) {
+        } catch {
           navigate('/')
           return
         }
@@ -142,7 +474,7 @@ function Game() {
       return
     }
     setStory(foundStory)
-    setTimeout(() => setIsInitializing(false), 400)
+    setTimeout(() => setIsInitializing(false), 500)
   }, [storyId, navigate])
 
   // 初始化消息
@@ -152,11 +484,7 @@ function Game() {
     const welcomeMessage: TMessage = {
       id: 'welcome',
       role: 'assistant',
-      content: `欢迎来到海龟汤游戏
-
-汤面：${story.surface}
-
-请开始你的推理之旅，每轮只能提问可以用「是」「否」或「无关」回答的问题。`,
+      content: `这是一道海龟汤谜题\n\n汤面：${story.surface}\n\n请通过提问来还原真相。只能问可以用「是」「否」或「无关」回答的问题。`,
       timestamp: Date.now(),
       type: 'user'
     }
@@ -183,16 +511,14 @@ function Game() {
     if (!story || isHintLoading) return
 
     setIsHintLoading(true)
-    setHintError(null)
     setShowHint(true)
     setCurrentHint(null)
 
     try {
       const hint = await getAIHint(story, messages)
       setCurrentHint(hint)
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : '获取提示失败'
-      setHintError(msg)
+    } catch {
+      setCurrentHint({ hint: '暂时无法获取提示', dimension: '未知' })
     } finally {
       setIsHintLoading(false)
     }
@@ -200,9 +526,16 @@ function Game() {
 
   // 发送消息
   const handleSend = useCallback(async () => {
-    const question = inputValue.trim()
-    if (!question || isLoading || gameStatus !== 'playing' || !story) return
+    const rawQuestion = (inputValue.trim() || voiceTranscript.trim())
+    if (!rawQuestion || isLoading || gameStatus !== 'playing' || !story) return
 
+    const validation = validateQuestion(rawQuestion)
+    if (!validation.isValid) {
+      setError(validation.errors[0])
+      return
+    }
+
+    const question = validation.sanitized!
     setError(null)
     setShowHint(false)
     setCurrentHint(null)
@@ -224,7 +557,7 @@ function Game() {
     const loadingMessage: TMessage = {
       id: loadingMessageId,
       role: 'assistant',
-      content: 'thinking...',
+      content: '',
       timestamp: Date.now(),
       type: 'system',
       status: 'loading'
@@ -246,95 +579,79 @@ function Game() {
           setGameStatus('success')
           playSound('victory')
 
-          const newQuestionCount = questionCount + 1
-          setQuestionCount(newQuestionCount)
+          setQuestionCount(prev => {
+            const newQuestionCount = prev + 1
 
-          saveGameRecord({
-            storyId: story.id,
-            playedAt: new Date().toISOString(),
-            questionCount: newQuestionCount,
-            isWin: true,
-            endType: 'guess'
-          })
-
-          // 保存回放
-          saveReplay({
-            storyId: story.id,
-            story,
-            messages: updated,
-            questionCount: newQuestionCount,
-            isWin: true,
-            endType: 'guess',
-            elapsedTime,
-            playedAt: new Date().toISOString()
-          })
-
-          // 检查是否完成每日挑战
-          const dailyChallenge = getDailyChallenge()
-          if (dailyChallenge && dailyChallenge.storyId === story.id && !dailyChallenge.completed) {
-            completeDailyChallenge()
-          }
-
-          const victoryMsg: TMessage = {
-            id: `victory-${Date.now()}`,
-            role: 'assistant',
-            content: '恭喜！你已经还原了真相！',
-            timestamp: Date.now(),
-            type: 'victory'
-          }
-
-          const finalMessages = [...updated, victoryMsg]
-          setTimeout(() => {
-            navigate('/result', {
-              state: { story, questionCount: newQuestionCount, messages: finalMessages, isWin: true, endType: 'guess', elapsedTime }
+            saveGameRecord({
+              storyId: story.id,
+              playedAt: new Date().toISOString(),
+              questionCount: newQuestionCount,
+              isWin: true,
+              endType: 'guess'
             })
-          }, 1500)
 
-          return finalMessages
+            saveReplay({
+              storyId: story.id,
+              story,
+              messages: updated,
+              questionCount: newQuestionCount,
+              isWin: true,
+              endType: 'guess',
+              elapsedTime,
+              playedAt: new Date().toISOString()
+            })
+
+            completeDailyChallenge(true, newQuestionCount).catch(() => {})
+
+            const victoryMsg: TMessage = {
+              id: `victory-${Date.now()}`,
+              role: 'assistant',
+              content: '恭喜！你已经还原了真相！',
+              timestamp: Date.now(),
+              type: 'victory'
+            }
+
+            const finalMessages = [...updated, victoryMsg]
+            setTimeout(() => {
+              navigate('/result', {
+                state: { story, questionCount: newQuestionCount, messages: finalMessages, isWin: true, endType: 'guess', elapsedTime }
+              })
+            }, 1500)
+
+            return newQuestionCount
+          })
+
+          return updated
         }
 
-        const newQuestionCount = questionCount + 1
-        setQuestionCount(newQuestionCount)
+        setQuestionCount(prev => prev + 1)
         playSound('receive')
         return updated
       })
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '未知错误'
+      const errorMessage = error instanceof Error ? error.message : '服务暂不可用'
       setError(errorMessage)
-
-      const isInvalidAnswer = errorMessage.includes('不符合规范')
 
       setMessages(prev => prev.map(msg =>
         msg.id === loadingMessageId
-          ? {
-              ...msg,
-              content: isInvalidAnswer
-                ? `${errorMessage}\n\n请重新提问，使用可以用「是」「否」或「无关」回答的问题。`
-                : `抱歉，AI 服务暂时不可用: ${errorMessage}`,
-              type: 'system' as const,
-              status: 'success' as const
-            }
+          ? { ...msg, content: errorMessage, type: 'system' as const, status: 'success' as const }
           : msg
       ))
     } finally {
       setIsLoading(false)
     }
-  }, [isLoading, gameStatus, story, questionCount, navigate, inputValue, playSound, elapsedTime])
-
-  // 键盘快捷键
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
-    }
-  }
+  }, [isLoading, gameStatus, story, navigate, inputValue, voiceTranscript, playSound, elapsedTime])
 
   // 放弃游戏
   const handleGiveUp = () => {
     playSound('defeat')
     setShowConfirm(true)
   }
+
   const confirmGiveUp = () => {
+    if (confirmingRef.current) return
+    confirmingRef.current = true
+
     if (story) {
       saveGameRecord({
         storyId: story.id,
@@ -343,7 +660,6 @@ function Game() {
         isWin: false,
         endType: 'giveup'
       })
-      // 保存回放
       saveReplay({
         storyId: story.id,
         story,
@@ -370,7 +686,6 @@ function Game() {
         isWin: true,
         endType: 'guess'
       })
-      // 保存回放
       saveReplay({
         storyId: story.id,
         story,
@@ -387,333 +702,239 @@ function Game() {
     })
   }
 
+  // 邀请好友
+  const handleInvite = () => {
+    const inviteLink = `${window.location.origin}/game/${storyId}`
+    navigator.clipboard.writeText(inviteLink).then(() => {
+      showToast('链接已复制', 'success')
+    }).catch(() => {
+      showToast('复制失败', 'error')
+    })
+    setShowInvite(false)
+  }
+
   if (!story) return null
 
   const isGameOver = gameStatus !== 'playing'
-  const diffConfig = difficultyConfig[story.difficulty]
 
-  // 加载状态
   if (isInitializing) {
-    return (
-      <div className="h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-dark-900 dark:to-dark-800 flex items-center justify-center">
-        <div className="text-center">
-          <div className="relative mb-4">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-game-500 to-purple-600 flex items-center justify-center text-5xl mx-auto shadow-lg shadow-game-500/30 animate-pulse">
-              🐢
-            </div>
-            {/* 加载光环 */}
-            <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-game-400 to-purple-400 opacity-30 blur-xl animate-pulse" />
-          </div>
-          <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">加载中...</p>
-        </div>
-      </div>
-    )
+    return <GameSkeleton />
   }
 
   return (
-    <div className="h-screen bg-gray-50 dark:bg-dark-900 flex flex-col relative overflow-hidden">
-      {/* 背景装饰 */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-game-500/5 to-purple-500/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-br from-purple-500/5 to-pink-500/5 rounded-full blur-3xl" />
+    <PageTransition>
+    <div className="h-screen bg-dark-900 flex flex-col relative overflow-hidden">
+      {/* 背景效果 */}
+      <div className="fixed inset-0 pointer-events-none">
+        {/* 网格背景 */}
+        <div className="absolute inset-0 opacity-[0.03]" style={{
+          backgroundImage: `linear-gradient(#6366f1 1px, transparent 1px), linear-gradient(90deg, #6366f1 1px, transparent 1px)`,
+          backgroundSize: '60px 60px'
+        }} />
+
+        {/* 渐变光晕 */}
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-game-500/10 rounded-full blur-[150px]" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-[150px]" />
       </div>
 
-      {/* 顶部栏 */}
-      <header className="relative bg-white/80 dark:bg-dark-800/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-dark-700/50 px-6 py-4 shrink-0 z-10">
-        <div className="flex items-center justify-between max-w-4xl mx-auto">
-          {/* 左侧 */}
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate('/')}
-              className="group flex items-center gap-2 px-3 py-2 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-700 transition-colors"
-            >
-              <span className="text-lg group-hover:-translate-x-1 transition-transform">←</span>
-              <span className="text-sm font-medium hidden sm:inline">返回</span>
-            </button>
+      {/* 状态栏 */}
+      <StatusBar
+        time={formatTime(elapsedTime)}
+        count={questionCount}
+        onHelp={() => setShowHelp(true)}
+        onInvite={() => setShowInvite(true)}
+      />
 
-            <div className="h-8 w-px bg-gray-200 dark:bg-dark-700 hidden sm:block" />
+      {/* 主内容 */}
+      <div className="flex-1 flex overflow-hidden relative z-10">
+        {/* 消息区域 */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-3xl mx-auto px-4 py-6">
+            {/* 汤面卡片 */}
+            <SurfaceCard surface={story.surface} difficulty={story.difficulty} />
 
-            {/* 标题和难度 */}
-            <div className="flex items-center gap-3">
-              <h1 className="text-gray-900 dark:text-white font-bold">{story.title}</h1>
-              <span className={`px-2.5 py-1 text-xs font-semibold rounded-lg ${diffConfig.bg} ${diffConfig.text} ${diffConfig.border} border`}>
-                {diffConfig.label}
-              </span>
+            {/* 消息列表 */}
+            <div className="mt-6 space-y-1">
+              {messages.map((message) => (
+                <MessageBubble key={message.id} message={message} />
+              ))}
             </div>
+            <div ref={messagesEndRef} />
+          </div>
+        </div>
+
+        {/* 右侧边栏 */}
+        <div className="hidden w-72 border-l border-dark-800 bg-dark-900/50 lg:flex flex-col backdrop-blur-sm">
+          <div className="p-4 border-b border-dark-800">
+            <h3 className="text-gray-400 text-xs font-bold tracking-wider uppercase">审讯记录</h3>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            {messages.filter(m => m.role === 'user' || (m.type !== 'system' && m.type !== 'user')).map((msg) => (
+              <div
+                key={msg.id}
+                className="p-3 rounded-lg bg-dark-800 border border-dark-700 hover:border-dark-600 transition-colors"
+              >
+                {msg.role === 'user' ? (
+                  <p className="text-gray-200 text-sm">{msg.content}</p>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <AnswerBadge type={msg.type} />
+                    <span className="text-gray-500 text-xs truncate">{msg.content}</span>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
 
-          {/* 右侧状态 */}
-          <div className="flex items-center gap-4">
-            {/* 计时器 */}
-            <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-dark-700 rounded-xl">
-              <span className="text-lg">⏱️</span>
-              <span className="font-mono font-bold text-gray-900 dark:text-white">{formatTime(elapsedTime)}</span>
-            </div>
-
-            {/* 提问次数 */}
-            <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-dark-700 rounded-xl">
-              <span className="text-lg">❓</span>
-              <span className="font-bold text-gray-900 dark:text-white">{questionCount}</span>
-              <span className="text-gray-500 text-xs hidden sm:inline">次提问</span>
-            </div>
-
-            {/* 提示按钮 */}
+          {/* 提示按钮 */}
+          <div className="p-4 border-t border-dark-800">
             <button
               onClick={handleGetHint}
               disabled={isHintLoading || isGameOver}
-              className="flex items-center gap-2 px-3 py-2 bg-amber-100 dark:bg-amber-500/20 hover:bg-amber-200 dark:hover:bg-amber-500/30 text-amber-600 dark:text-amber-400 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full py-3 bg-dark-800 hover:bg-dark-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-gray-400 text-sm font-medium transition-colors flex items-center justify-center gap-2 border border-dark-700"
             >
-              <span className="text-lg">💡</span>
-              <span className="text-sm font-medium hidden sm:inline">
-                {isHintLoading ? '分析中...' : '提示'}
-              </span>
-            </button>
-
-            {/* 线索按钮 */}
-            <button
-              onClick={() => setIsCluePanelOpen(!isCluePanelOpen)}
-              className="flex items-center gap-2 px-3 py-2 bg-purple-100 dark:bg-purple-500/20 hover:bg-purple-200 dark:hover:bg-purple-500/30 text-purple-600 dark:text-purple-400 rounded-xl transition-colors"
-            >
-              <span className="text-lg">📋</span>
-              <span className="text-sm font-medium hidden sm:inline">线索</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="9" y1="18" x2="15" y2="18" />
+                <line x1="10" y1="22" x2="14" y2="22" />
+                <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14" />
+              </svg>
+              {isHintLoading ? '分析中...' : '获取提示'}
             </button>
           </div>
         </div>
-      </header>
+      </div>
 
-      {/* 错误提示 - 游戏化风格 */}
-      {error && (
-        <div className="relative bg-gradient-to-r from-red-500/10 to-rose-500/10 border-b border-red-500/20 px-6 py-3 shrink-0">
-          <div className="flex items-center justify-between max-w-4xl mx-auto">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center">
-                <span className="text-red-500">⚠️</span>
-              </div>
-              <span className="text-red-600 dark:text-red-400 text-sm font-medium">{error}</span>
-            </div>
-            <button
-              onClick={() => setError(null)}
-              className="text-red-400 hover:text-red-600 transition-colors p-1"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* AI提示区域 */}
+      {/* AI提示 */}
       {showHint && (
-        <div className="relative bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-b border-amber-500/20 px-6 py-4 shrink-0">
-          <div className="flex items-start gap-4 max-w-4xl mx-auto">
-            <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg">
-              💡
+        <div className="relative z-10 mx-4 mb-2 p-4 bg-dark-800 rounded-xl border border-dark-700">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2">
+                <line x1="9" y1="18" x2="15" y2="18" />
+                <line x1="10" y1="22" x2="14" y2="22" />
+                <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14" />
+              </svg>
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-amber-600 dark:text-amber-400 text-sm font-bold">AI 提示</span>
-                {currentHint && dimensionLabels[currentHint.dimension] && (
-                  <span className={`flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-dark-800/50 ${dimensionLabels[currentHint.dimension].color}`}>
-                    <span>{dimensionLabels[currentHint.dimension].icon}</span>
-                    <span>{dimensionLabels[currentHint.dimension].label}</span>
-                  </span>
-                )}
-              </div>
+            <div className="flex-1">
+              <span className="text-amber-400 text-xs font-bold">AI 提示</span>
               {isHintLoading ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
-                  <span className="text-amber-600 dark:text-amber-400 text-sm">AI 正在分析中...</span>
+                <div className="flex items-center gap-2 mt-1">
+                  <div className="w-3 h-3 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
+                  <span className="text-amber-400/60 text-xs">分析中...</span>
                 </div>
-              ) : hintError ? (
-                <p className="text-red-500 text-sm">{hintError}</p>
               ) : currentHint ? (
-                <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed">{currentHint.hint}</p>
+                <p className="text-gray-400 text-sm mt-1">{currentHint.hint}</p>
               ) : null}
             </div>
-            <button
-              onClick={() => setShowHint(false)}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 transition-colors"
-            >
-              ×
+            <button onClick={() => setShowHint(false)} className="text-gray-500 hover:text-gray-300">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
             </button>
           </div>
         </div>
       )}
 
-      {/* 汤面提示 - 游戏化风格 */}
-      <div className="relative bg-gradient-to-r from-game-500/5 to-purple-500/5 border-b border-game-500/10 px-6 py-4 shrink-0">
-        <div className="max-w-4xl mx-auto flex items-center gap-3">
-          <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-gradient-to-br from-game-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold shadow">
-            汤
-          </div>
-          <p className="text-gray-600 dark:text-gray-400 text-sm italic">"{story.surface}"</p>
-        </div>
-      </div>
-
-      {/* 消息区域 */}
-      <div className="relative flex-1 overflow-y-auto px-6 py-6">
-        <div className="max-w-4xl mx-auto">
-          {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full">
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-game-500/20 to-purple-500/20 flex items-center justify-center text-4xl mb-4">
-                🐢
-              </div>
-              <p className="text-gray-400 dark:text-gray-500 text-sm">开始你的推理之旅</p>
-            </div>
-          ) : (
-            <>
-              {/* 折叠/展开按钮 */}
-              {messages.length > COLLAPSE_THRESHOLD && (
-                <button
-                  onClick={() => setIsHistoryCollapsed(!isHistoryCollapsed)}
-                  className="w-full mb-4 py-2.5 text-sm font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-dark-800 hover:bg-gray-200 dark:hover:bg-dark-700 rounded-xl transition-colors flex items-center justify-center gap-2"
-                >
-                  {isHistoryCollapsed ? (
-                    <>
-                      <span>▼</span>
-                      <span>展开剩余 {messages.length - COLLAPSE_THRESHOLD} 条消息</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>▲</span>
-                      <span>收起早期消息</span>
-                    </>
-                  )}
-                </button>
-              )}
-
-              <div className="space-y-1">
-                {(isHistoryCollapsed ? messages.slice(-COLLAPSE_THRESHOLD) : messages).map((message, index) => {
-                  const actualIndex = isHistoryCollapsed ? messages.length - COLLAPSE_THRESHOLD + index : index
-                  return (
-                    <div
-                      key={message.id}
-                      className="animate-fade-in-up"
-                      style={{ animationDelay: `${actualIndex * 30}ms` }}
-                    >
-                      <Message
-                        message={message}
-                        isLatest={actualIndex === messages.length - 1}
-                      />
-                    </div>
-                  )
-                })}
-              </div>
-            </>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
-      </div>
-
-      {/* 输入区域 - 游戏化风格 */}
-      <div className="relative bg-white/80 dark:bg-dark-800/80 backdrop-blur-xl border-t border-gray-200/50 dark:border-dark-700/50 px-6 py-4 shrink-0">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex gap-3">
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={isGameOver ? '游戏已结束' : '输入问题...'}
-              disabled={isGameOver}
-              className="flex-1 bg-gray-100 dark:bg-dark-700 border border-gray-200 dark:border-dark-600 rounded-2xl px-5 py-3.5
-                         text-sm text-gray-900 dark:text-white placeholder-gray-400
-                         focus:outline-none focus:border-game-500 focus:ring-2 focus:ring-game-500/20
-                         disabled:opacity-50 disabled:cursor-not-allowed
-                         transition-all duration-200"
-            />
-            <button
-              onClick={handleSend}
-              disabled={!inputValue.trim() || isGameOver || isLoading}
-              className="px-6 py-3.5 bg-gradient-to-r from-game-500 to-purple-600 hover:from-game-600 hover:to-purple-700
-                         text-white font-bold rounded-2xl text-sm shadow-lg shadow-game-500/30
-                         disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none
-                         transition-all duration-200 active:scale-95 flex items-center gap-2"
-            >
-              {isLoading ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>发送中</span>
-                </>
-              ) : (
-                <>
-                  <span>发送</span>
-                  <span>→</span>
-                </>
-              )}
-            </button>
-          </div>
-
-          {/* 底部提示 */}
-          <div className="flex items-center justify-between mt-3">
-            <p className="text-xs text-gray-400">
-              按 Enter 发送 | 仅支持是/否/无关类型问题
-            </p>
-            <div className="flex gap-4">
-              <button
-                onClick={handleGiveUp}
-                disabled={isGameOver}
-                className="text-xs text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
-              >
-                <span>🏳️</span>
-                <span>放弃</span>
-              </button>
-              <button
-                onClick={handleGuess}
-                disabled={isGameOver}
-                className="text-xs text-gray-500 dark:text-gray-400 hover:text-emerald-500 dark:hover:text-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
-              >
-                <span>🎯</span>
-                <span>猜答案</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 确认弹窗 */}
-      {showConfirm && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div className="relative bg-white dark:bg-dark-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl overflow-hidden">
-            {/* 装饰 */}
-            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-red-500/10 to-transparent rounded-bl-full" />
-
-            <div className="relative">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-red-500/20 to-rose-500/20 flex items-center justify-center">
-                <span className="text-3xl">🏳️</span>
-              </div>
-
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white text-center mb-2">确认放弃？</h3>
-              <p className="text-gray-500 dark:text-gray-400 text-sm text-center mb-6">
-                你已提问 <span className="font-bold text-gray-900 dark:text-white">{questionCount}</span> 次，确认要放弃并查看汤底吗？
-              </p>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowConfirm(false)}
-                  className="flex-1 px-4 py-3 bg-gray-100 dark:bg-dark-700 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 dark:hover:bg-dark-600 transition-colors font-medium text-sm"
-                >
-                  继续游戏
-                </button>
-                <button
-                  onClick={confirmGiveUp}
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-xl hover:from-red-600 hover:to-rose-600 transition-colors font-bold text-sm shadow-lg shadow-red-500/30"
-                >
-                  确认放弃
-                </button>
-              </div>
-            </div>
+      {/* 错误提示 */}
+      {error && (
+        <div className="relative z-10 mx-4 mb-2 p-3 bg-red-500/10 rounded-lg border border-red-500/20">
+          <div className="flex items-center justify-between">
+            <span className="text-red-400 text-sm">{error}</span>
+            <button onClick={() => setError(null)} className="text-red-400/60 hover:text-red-400">×</button>
           </div>
         </div>
       )}
 
-      {/* 线索笔记面板 */}
-      <CluePanel
-        messages={messages}
-        isOpen={isCluePanelOpen}
-        onToggle={() => setIsCluePanelOpen(!isCluePanelOpen)}
+      {/* 输入区域 */}
+      <InputArea
+        value={inputValue}
+        onChange={setInputValue}
+        onSubmit={handleSend}
+        onGiveUp={handleGiveUp}
+        onGuess={handleGuess}
+        disabled={isGameOver}
+        isLoading={isLoading}
       />
+
+      {/* 确认放弃弹窗 */}
+      <Modal isOpen={showConfirm} onClose={() => setShowConfirm(false)} title="确认放弃">
+        <div className="text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2">
+              <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+              <line x1="4" y1="22" x2="4" y2="15" />
+            </svg>
+          </div>
+          <p className="text-gray-400 mb-2">你已提问 <span className="text-white font-bold">{questionCount}</span> 次</p>
+          <p className="text-gray-500 text-sm mb-6">确认要放弃并查看汤底吗？</p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowConfirm(false)}
+              className="flex-1 py-3 bg-dark-700 hover:bg-dark-600 rounded-xl text-gray-300 font-medium transition-colors"
+            >
+              继续
+            </button>
+            <button
+              onClick={confirmGiveUp}
+              className="flex-1 py-3 bg-red-500 hover:bg-red-600 rounded-xl text-white font-bold transition-colors"
+            >
+              放弃
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* 帮助弹窗 */}
+      <Modal isOpen={showHelp} onClose={() => setShowHelp(false)} title="游戏规则">
+        <div className="space-y-4">
+          <div className="p-4 bg-dark-700 rounded-xl">
+            <h4 className="text-white font-bold mb-2">规则</h4>
+            <ul className="text-gray-400 text-sm space-y-2">
+              <li>• 每轮只能提问可以用「是」「否」或「无关」回答的问题</li>
+              <li>• 通过提问逐步还原故事真相</li>
+              <li>• 点击「猜答案」可以直接揭晓答案</li>
+            </ul>
+          </div>
+          <div className="p-4 bg-dark-700 rounded-xl">
+            <h4 className="text-white font-bold mb-2">快捷键</h4>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="flex items-center gap-2">
+                <kbd className="px-2 py-1 bg-dark-900 rounded text-game-400 text-xs">Enter</kbd>
+                <span className="text-gray-500">发送</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <kbd className="px-2 py-1 bg-dark-900 rounded text-game-400 text-xs">?</kbd>
+                <span className="text-gray-500">帮助</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* 邀请弹窗 */}
+      <Modal isOpen={showInvite} onClose={() => setShowInvite(false)} title="邀请好友">
+        <div className="text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-game-500/10 border border-game-500/20 flex items-center justify-center">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+          </div>
+          <p className="text-gray-400 mb-2">当前故事：{story.title}</p>
+          <p className="text-gray-500 text-sm mb-6">邀请好友一起来解谜</p>
+          <button
+            onClick={handleInvite}
+            className="w-full py-3 bg-game-500 hover:bg-game-600 rounded-xl text-white font-bold transition-colors"
+          >
+            复制邀请链接
+          </button>
+        </div>
+      </Modal>
     </div>
+    </PageTransition>
   )
 }
 

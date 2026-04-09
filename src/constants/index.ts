@@ -49,9 +49,18 @@ export const STORAGE_KEYS = {
 // API 配置
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 
+// 生产环境必须有 API_BASE_URL，否则请求会失败
+const getApiUrl = (path: string) => {
+  if (API_BASE_URL) {
+    return `${API_BASE_URL}${path}`
+  }
+  // 开发环境使用相对路径，通过 Vite proxy 转发
+  return path
+}
+
 export const API_CONFIG = {
-  AI_JUDGE: `${API_BASE_URL}/api/ai/judge`,
-  AI_GENERATE: `${API_BASE_URL}/api/ai/generate`,
-  AI_HINT: `${API_BASE_URL}/api/ai/hint`,
-  CHAT: `${API_BASE_URL}/api/chat`
+  AI_JUDGE: getApiUrl('/api/v1/ai/judge'),
+  AI_GENERATE: getApiUrl('/api/v1/ai/generate'),
+  AI_HINT: getApiUrl('/api/v1/ai/hint'),
+  CHAT: getApiUrl('/api/chat')
 } as const

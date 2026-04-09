@@ -6,7 +6,7 @@
 import type { AuthResponse, LoginCredentials, RegisterCredentials, User } from '../types/auth'
 import { STORAGE_KEYS } from '../constants'
 
-const API_BASE = '/api/auth'
+const API_BASE = '/api/v1/auth'
 
 /**
  * 注册
@@ -21,17 +21,26 @@ export async function register(credentials: RegisterCredentials): Promise<AuthRe
     body: JSON.stringify({
       username: credentials.username,
       email: credentials.email,
-      password: credentials.password
+      password: credentials.password,
+      confirmPassword: credentials.confirmPassword || credentials.password
     })
   })
 
-  const data = await response.json()
+  let data
+  try {
+    data = await response.json()
+  } catch {
+    if (!response.ok) {
+      throw new Error('注册失败，服务器响应异常')
+    }
+    throw new Error('服务器响应格式错误')
+  }
 
   if (!response.ok) {
     throw new Error(data.error || '注册失败')
   }
 
-  return data
+  return data.data
 }
 
 /**
@@ -50,13 +59,21 @@ export async function login(credentials: LoginCredentials): Promise<AuthResponse
     })
   })
 
-  const data = await response.json()
+  let data
+  try {
+    data = await response.json()
+  } catch {
+    if (!response.ok) {
+      throw new Error('登录失败，服务器响应异常')
+    }
+    throw new Error('服务器响应格式错误')
+  }
 
   if (!response.ok) {
     throw new Error(data.error || '登录失败')
   }
 
-  return data
+  return data.data
 }
 
 /**
@@ -66,10 +83,19 @@ export async function getCurrentUser(token: string): Promise<{ user: User }> {
   const response = await fetch(`${API_BASE}/me`, {
     headers: {
       'Authorization': `Bearer ${token}`
-    }
+    },
+    credentials: 'include' // 发送 cookies
   })
 
-  const data = await response.json()
+  let data
+  try {
+    data = await response.json()
+  } catch {
+    if (!response.ok) {
+      throw new Error('获取用户信息失败，服务器响应异常')
+    }
+    throw new Error('服务器响应格式错误')
+  }
 
   if (!response.ok) {
     throw new Error(data.error || '获取用户信息失败')

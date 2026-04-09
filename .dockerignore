@@ -1,0 +1,73 @@
+# ============================================
+# Docker Ignore - 根目录
+# ============================================
+
+# 依赖
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 构建产物
+dist
+dist-ssr
+*.local
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.sw?
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw
+
+# 环境文件
+.env
+.env.local
+.env.*.local
+.env.production
+.env.production.local
+
+# Docker 文件 (避免递归)
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# GitHub
+.github
+
+# 文档
+*.md
+!README.md
+
+# 测试
+coverage
+*.test.js
+*.spec.js
+
+# 临时文件
+*.log
+logs
+tmp
+temp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 数据库 (SQLite)
+*.db
+*.sqlite
+
+# 研究文档
+RESEARCH.md
+技术设计文档.md
+AI海龟汤游戏Prd.md
+AGENTS.md

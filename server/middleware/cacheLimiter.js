@@ -1,7 +1,7 @@
 // AI响应缓存中间件
 // 使用Redis缓存AI响应，减少重复API调用
 
-import { getRedisClient, cacheKeys } from '../db/redis.js'
+import { getRedisClient, isRedisAvailable, cacheKeys } from '../db/redis.js'
 
 // 创建AI响应的hash key
 function createQuestionHash(question, storyId) {
@@ -17,8 +17,16 @@ function createQuestionHash(question, storyId) {
 
 // 获取缓存的AI响应
 export async function getCachedAIResponse(question, storyId) {
+  // 如果 Redis 不可用，直接跳过缓存
+  if (!isRedisAvailable()) {
+    return null
+  }
+
   try {
     const redis = getRedisClient()
+    if (!redis || redis.status !== 'ready') {
+      return null
+    }
     const hash = createQuestionHash(question, storyId)
     const key = cacheKeys.aiResponse(hash)
     const cached = await redis.get(key)
@@ -34,8 +42,16 @@ export async function getCachedAIResponse(question, storyId) {
 
 // 缓存AI响应
 export async function cacheAIResponse(question, storyId, answer, ttlSeconds = 3600) {
+  // 如果 Redis 不可用，直接跳过缓存
+  if (!isRedisAvailable()) {
+    return
+  }
+
   try {
     const redis = getRedisClient()
+    if (!redis || redis.status !== 'ready') {
+      return
+    }
     const hash = createQuestionHash(question, storyId)
     const key = cacheKeys.aiResponse(hash)
     await redis.setex(key, ttlSeconds, JSON.stringify({ answer }))

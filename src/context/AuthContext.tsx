@@ -25,6 +25,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // 初始化 - 检查本地存储的 token
   useEffect(() => {
+    let isMounted = true
+
     const initAuth = async () => {
       const token = authService.getToken()
       const savedUser = authService.getUser()
@@ -33,6 +35,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // 验证 token 是否有效
         try {
           const { user } = await authService.getCurrentUser(token)
+          if (!isMounted) return // 组件已卸载，不再更新状态
           setState({
             user,
             token,
@@ -42,6 +45,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           // 更新本地存储的用户信息
           authService.saveUser(user)
         } catch {
+          if (!isMounted) return
           // token 无效，清除
           authService.removeToken()
           authService.removeUser()
@@ -53,16 +57,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
           })
         }
       } else {
+        if (!isMounted) return
         setState(prev => ({ ...prev, isLoading: false }))
       }
     }
 
     initAuth()
+
+    return () => {
+      isMounted = false
+    }
   }, [])
 
   const login = useCallback(async (credentials: LoginCredentials) => {
-    const response = await authService.login(credentials)
-    const { token, user } = response
+    const { token, user } = await authService.login(credentials)
 
     authService.saveToken(token)
     authService.saveUser(user)
@@ -76,8 +84,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [])
 
   const register = useCallback(async (credentials: RegisterCredentials) => {
-    const response = await authService.register(credentials)
-    const { token, user } = response
+    const { token, user } = await authService.register(credentials)
 
     authService.saveToken(token)
     authService.saveUser(user)
@@ -90,7 +97,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     })
   }, [])
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    try {
+      await authService.logout()
+    } catch (e) {
+      console.warn('Logout API call failed:', e)
+    }
     authService.removeToken()
     authService.removeUser()
     setState({

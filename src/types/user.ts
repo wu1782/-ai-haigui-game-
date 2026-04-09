@@ -32,6 +32,7 @@ export interface UserStats {
   achievements: string[]  // 已解锁成就ID列表
   rank: number            // 当前等级
   lastPlayedAt?: string   // 最后游戏时间
+  difficultyWins: Record<string, number>  // 各难度通关次数 { easy: n, medium: n, hard: n, extreme: n }
 }
 
 // 用户设置

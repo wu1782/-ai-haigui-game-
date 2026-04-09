@@ -1,0 +1,40 @@
+# ============================================
+# AI 海龟汤游戏 - 前端 Dockerfile (Nginx)
+# ============================================
+
+# 构建阶段
+FROM node:20-alpine as builder
+
+WORKDIR /app
+
+# 复制 package 文件
+COPY package*.json ./
+
+# 安装依赖（包括 devDependencies 用于构建）
+RUN npm ci
+
+# 复制源代码
+COPY . .
+
+# 构建生产版本
+RUN npm run build
+
+# ------------------------------------------
+# Nginx 阶段
+# ------------------------------------------
+FROM nginx:alpine
+
+# 复制 Nginx 配置
+COPY nginx.conf /etc/nginx/nginx.conf
+
+# 复制构建产物
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# 暴露端口
+EXPOSE 80
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD wget --no-redirect --spider http://localhost/ || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]

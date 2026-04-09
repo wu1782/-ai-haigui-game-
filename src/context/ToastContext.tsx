@@ -6,11 +6,19 @@ export interface Toast {
   id: string
   message: string
   type: ToastType
+  duration?: number
+}
+
+// Toast显示时长配置（毫秒）
+const DEFAULT_DURATIONS: Record<ToastType, number> = {
+  success: 2000,  // 成功消息较短
+  error: 4000,    // 错误消息需要更长时间阅读
+  info: 3000      // 普通信息默认3秒
 }
 
 interface ToastContextType {
   toasts: Toast[]
-  showToast: (message: string, type?: ToastType) => void
+  showToast: (message: string, type?: ToastType, duration?: number) => void
   hideToast: (id: string) => void
 }
 
@@ -20,9 +28,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
   const timeoutRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
-  const showToast = useCallback((message: string, type: ToastType = 'info') => {
+  const showToast = useCallback((message: string, type: ToastType = 'info', duration?: number) => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    const newToast: Toast = { id, message, type }
+    const newToast: Toast = { id, message, type, duration }
 
     setToasts(prev => [...prev, newToast])
 
@@ -32,11 +40,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       clearTimeout(existingTimeout)
     }
 
-    // 自动消失（3秒）
+    // 自动消失 - 使用指定时长或默认值
+    const autoHideDuration = duration ?? DEFAULT_DURATIONS[type]
     const timeout = setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id))
       timeoutRefs.current.delete(id)
-    }, 3000)
+    }, autoHideDuration)
     timeoutRefs.current.set(id, timeout)
   }, [])
 
