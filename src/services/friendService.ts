@@ -1,7 +1,7 @@
 /**
  * 好友服务 - 调用后端 API
  */
-import type { Friend, FriendRequest, UserSearchResult, PaginatedSearchResult } from '../types/friend'
+import type { Friend, FriendRequest, PaginatedSearchResult } from '../types/friend'
 
 const FRIENDS_KEY = 'turtle-soup-friends'
 const REQUESTS_KEY = 'turtle-soup-friend-requests'

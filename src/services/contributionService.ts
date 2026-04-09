@@ -2,14 +2,14 @@
  * 投稿服务 - 故事投稿和审核 API
  */
 
-import { API_CONFIG, STORAGE_KEYS } from '../constants'
+import { STORAGE_KEYS } from '../constants'
 import type { ContributePayload, Contribution, ContributionStory, StoryStatus } from '../types/story'
 
 const API_BASE = '/api/v1/stories'
 
 // 获取 token
 function getToken(): string | null {
-  return localStorage.getItem(STORAGE_KEYS.TOKEN)
+  return localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN)
 }
 
 // 通用请求头

@@ -4,7 +4,7 @@ import { getLeaderboard } from '../data/leaderboard'
 import { LEADERBOARD_CONFIGS } from '../types/leaderboard'
 import type { LeaderboardType, LeaderboardEntry } from '../types/leaderboard'
 import { PageTransition, FadeIn } from '../components/PageTransition'
-import { PageErrorState, LeaderboardItemSkeleton } from '../components'
+import { LeaderboardItemSkeleton } from '../components'
 import { EmptyLeaderboard } from '../components/EmptyState'
 
 /**

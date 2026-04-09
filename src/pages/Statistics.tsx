@@ -5,7 +5,6 @@ import { memo } from 'react'
 import { Link } from 'react-router-dom'
 import { useAnalytics, formatGameTime, getDifficultyLabel } from '../hooks/useAnalytics'
 import { PageTransition, FadeIn } from '../components/PageTransition'
-import { AchievementCardSkeleton } from '../components'
 
 /**
  * 统计卡片组件
@@ -100,7 +99,6 @@ const TrendChart = memo(function TrendChart({
 }: {
   data: number[]
 }) {
-  const maxValue = 100
   const points = data.map((value, index) => {
     const x = (index / (data.length - 1 || 1)) * 100
     const y = 100 - value

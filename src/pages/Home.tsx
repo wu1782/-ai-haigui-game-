@@ -12,7 +12,6 @@ import { useAuth } from '../hooks/useAuth'
 import { getDailyChallenge, getDailyChallengeStory } from '../data/dailyChallenge'
 import FriendsDrawer from '../components/FriendsDrawer'
 import { DIFFICULTY_CONFIG, STORAGE_KEYS } from '../constants'
-import { useToast } from '../context/ToastContext'
 import { CaseFileCardSkeleton, StoryCardListSkeleton, PageErrorState } from '../components'
 import { NoStoriesEmpty } from '../components/EmptyState'
 import { FadeIn, PageTransition } from '../components/PageTransition'
@@ -188,8 +187,7 @@ const NavButton = memo(function NavButton({ to, icon, label, isActive }: { to: s
  */
 function Home() {
   const navigate = useNavigate()
-  const { user, logout } = useAuth()
-  const { showToast } = useToast()
+  const { user } = useAuth()
   const [sortType, setSortType] = useState<StorySortType>('hottest')
   const [playedIds] = useState<string[]>(getPlayedStoryIds())
   const [stats] = useState(() => getUserStats())
@@ -197,6 +195,8 @@ function Home() {
   const [showFriendsDrawer, setShowFriendsDrawer] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [challenge, setChallenge] = useState<import('../data/dailyChallenge').DailyChallengeProgress | null>(null)
+  const [challengeStory, setChallengeStory] = useState<import('../types/story').TStory | null>(null)
   const itemsPerPage = 9
 
   // 搜索和筛选状态
@@ -204,6 +204,16 @@ function Home() {
   const [selectedDifficulties, setSelectedDifficulties] = useState<Difficulty[]>([])
   const [showDifficultyFilter, setShowDifficultyFilter] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
+
+  // 加载每日挑战
+  useEffect(() => {
+    const loadChallenge = async () => {
+      const [c, s] = await Promise.all([getDailyChallenge(), getDailyChallengeStory()])
+      setChallenge(c)
+      setChallengeStory(s)
+    }
+    loadChallenge()
+  }, [])
 
   // 模拟加载
   useEffect(() => {
@@ -447,8 +457,6 @@ function Home() {
 
         {/* 每日挑战 + 用户状态 - 整合设计 */}
         {(() => {
-          const challenge = getDailyChallenge()
-          const challengeStory = getDailyChallengeStory()
           const isCompleted = challenge?.progress?.completed
 
           return (
@@ -549,11 +557,11 @@ function Home() {
                         <div className="text-[10px] text-gray-500">总局数</div>
                       </div>
                       <div className="flex-1 text-center p-2 bg-white/50 dark:bg-dark-800/50 rounded-lg border border-gray-100 dark:border-dark-700/50 hover:border-purple-500/30 transition-colors">
-                        <div className="text-lg font-bold text-purple-500">{stats.solvedCount || 0}</div>
+                        <div className="text-lg font-bold text-purple-500">{stats.totalWins || 0}</div>
                         <div className="text-[10px] text-gray-500">已解谜</div>
                       </div>
                       <div className="flex-1 text-center p-2 bg-white/50 dark:bg-dark-800/50 rounded-lg border border-gray-100 dark:border-dark-700/50 hover:border-pink-500/30 transition-colors">
-                        <div className="text-lg font-bold text-pink-500">{stats.perfectCount || 0}</div>
+                        <div className="text-lg font-bold text-pink-500">{stats.perfectGames || 0}</div>
                         <div className="text-[10px] text-gray-500">完美解</div>
                       </div>
                     </div>

@@ -60,7 +60,7 @@ function Multiplayer() {
   // 登录检查
   useEffect(() => {
     if (!isAuthenticated) {
-      showToast('请先登录后进入多人游戏', 'warning')
+      showToast('请先登录后进入多人游戏', 'info')
       navigate('/auth')
     }
   }, [isAuthenticated, navigate, showToast])

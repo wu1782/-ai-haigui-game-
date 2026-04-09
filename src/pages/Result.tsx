@@ -107,7 +107,7 @@ function Result() {
 
       try {
         // 提交最少提问次数排行榜
-        await saveLeaderboardEntry('fewestQuestions', {
+        await saveLeaderboardEntry('fewest_questions', {
           userId: user.id,
           username: user.username,
           value: questionCount,
