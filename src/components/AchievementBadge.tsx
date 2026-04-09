@@ -1,7 +1,6 @@
 /**
  * 成就徽章组件 - 3D 翻转效果
  */
-import { memo } from 'react'
 import { ACHIEVEMENTS } from '../types/user'
 import { getUserStats } from '../data/userData'
 
@@ -144,7 +143,7 @@ interface AchievementUnlockEffectProps {
 
 export function AchievementUnlockEffect({
   achievementId,
-  onComplete,
+  onComplete: _onComplete,
   duration = 3000
 }: AchievementUnlockEffectProps) {
   const achievement = ACHIEVEMENTS.find(a => a.id === achievementId)

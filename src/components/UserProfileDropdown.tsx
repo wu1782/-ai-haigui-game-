@@ -2,7 +2,7 @@
  * 用户状态与成就下拉组件
  * 包含登录按钮 / 头像 + 等级光环 / 下拉菜单（用户信息、成就、统计、设置、退出）
  */
-import { useState, useRef, useEffect, type ReactNode } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import Avatar from './Avatar'
@@ -220,14 +220,14 @@ export default function UserProfileDropdown() {
             className={`absolute -inset-1.5 rounded-full bg-gradient-to-r ${gradient?.ring} opacity-40 blur-sm group-hover:opacity-60 transition-opacity -z-10`}
           />
           <Avatar
-            src={profile.avatar}
-            username={profile.username}
+            src={profile!.avatar}
+            username={profile!.username}
             size="md"
-            level={profile.level}
+            level={profile!.level}
           />
         </div>
         <span className="text-gray-700 dark:text-gray-200 text-sm font-medium hidden sm:inline">
-          {profile.username}
+          {profile!.username}
         </span>
         <span className={`w-4 h-4 flex items-center justify-center text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
           ▼
@@ -255,50 +255,50 @@ export default function UserProfileDropdown() {
                   className={`absolute -inset-1.5 rounded-full bg-gradient-to-r ${gradient?.ring} opacity-30 blur-md -z-10`}
                 />
                 <Avatar
-                  src={profile.avatar}
-                  username={profile.username}
+                  src={profile!.avatar}
+                  username={profile!.username}
                   size="lg"
-                  level={profile.level}
+                  level={profile!.level}
                 />
               </div>
 
               {/* 用户名 & 等级 */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
-                  <span className="font-bold text-white truncate">{profile.username}</span>
+                  <span className="font-bold text-white truncate">{profile!.username}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={`px-2 py-0.5 text-xs font-bold rounded-full bg-gradient-to-r ${gradient?.ring} text-white`}>
-                    Lv.{profile.level}
+                    Lv.{profile!.level}
                   </span>
-                  <span className="text-sm text-gray-300">{profile.title}</span>
+                  <span className="text-sm text-gray-300">{profile!.title}</span>
                 </div>
               </div>
             </div>
 
             {/* 经验值进度条 */}
             <div className="mt-3">
-              <ExpProgressBar current={profile.currentExp} max={profile.maxExp} level={profile.level} />
+              <ExpProgressBar current={profile!.currentExp} max={profile!.maxExp} level={profile!.level} />
             </div>
           </div>
 
           {/* 已解锁成就展示 */}
-          {profile.achievements.length > 0 && (
+          {profile!.achievements.length > 0 && (
             <div className="px-4 py-3 border-b border-white/5">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs text-gray-400 flex items-center gap-1">
                   <span>🏆</span>
                   已解锁成就
                 </span>
-                <span className="text-xs text-gray-500">{profile.achievements.length} 个</span>
+                <span className="text-xs text-gray-500">{profile!.achievements.length} 个</span>
               </div>
               <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
-                {profile.achievements.slice(0, 8).map((achId) => (
+                {profile!.achievements.slice(0, 8).map((achId) => (
                   <AchievementBadge key={achId} achievementId={achId} size="sm" />
                 ))}
-                {profile.achievements.length > 8 && (
+                {profile!.achievements.length > 8 && (
                   <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-xs text-gray-400 flex-shrink-0">
-                    +{profile.achievements.length - 8}
+                    +{profile!.achievements.length - 8}
                   </div>
                 )}
               </div>
@@ -309,21 +309,21 @@ export default function UserProfileDropdown() {
           <div className="px-4 py-3 border-b border-white/5">
             <div className="grid grid-cols-3 gap-2">
               <div className="text-center p-2 rounded-lg bg-white/5">
-                <div className="text-lg font-bold text-white">{profile.totalGames}</div>
+                <div className="text-lg font-bold text-white">{profile!.totalGames}</div>
                 <div className="text-[10px] text-gray-400 flex items-center justify-center gap-1">
                   <span>📖</span>
                   总局数
                 </div>
               </div>
               <div className="text-center p-2 rounded-lg bg-white/5">
-                <div className="text-lg font-bold text-emerald-400">{profile.solvedCount}</div>
+                <div className="text-lg font-bold text-emerald-400">{profile!.solvedCount}</div>
                 <div className="text-[10px] text-gray-400 flex items-center justify-center gap-1">
                   <span>📈</span>
                   已解谜
                 </div>
               </div>
               <div className="text-center p-2 rounded-lg bg-white/5">
-                <div className="text-lg font-bold text-amber-400">{profile.perfectSolve}</div>
+                <div className="text-lg font-bold text-amber-400">{profile!.perfectSolve}</div>
                 <div className="text-[10px] text-gray-400 flex items-center justify-center gap-1">
                   <span>❓</span>
                   完美解
@@ -337,7 +337,7 @@ export default function UserProfileDropdown() {
             <MenuItem
               icon="🏆"
               label="我的成就"
-              badge={profile.achievements.length}
+              badge={profile!.achievements.length}
               to="/achievements"
             />
             <MenuItem

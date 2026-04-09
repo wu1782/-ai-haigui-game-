@@ -22,10 +22,10 @@ export const HintPanel = memo(function HintPanel({
   onClose,
   hints,
   onRequestHint,
-  currentCost,
+  currentCost: _currentCost,
   remainingScore
 }: HintPanelProps) {
-  const [selectedType, setSelectedType] = useState<string | null>(null)
+  const [, setSelectedType] = useState<string | null>(null)
 
   const hintTypes = [
     {

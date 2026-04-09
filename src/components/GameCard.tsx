@@ -165,7 +165,7 @@ const GameCard = memo(function GameCard({
   const [isBookmarked, setIsBookmarked] = useState(initialBookmarked ?? storedBookmark)
 
   // 处理点赞
-  const handleLike = useCallback((e: React.MouseEvent) => {
+  const handleLike = useCallback((_e: React.MouseEvent) => {
     const newLiked = !isLiked
     const newCount = newLiked ? likeCount + 1 : likeCount - 1
 
@@ -177,7 +177,7 @@ const GameCard = memo(function GameCard({
   }, [isLiked, likeCount, onLikeChange])
 
   // 处理收藏
-  const handleBookmark = useCallback((e: React.MouseEvent) => {
+  const handleBookmark = useCallback((_e: React.MouseEvent) => {
     const newBookmarked = !isBookmarked
 
     // 乐观更新

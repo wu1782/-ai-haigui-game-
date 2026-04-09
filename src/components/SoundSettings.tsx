@@ -1,7 +1,7 @@
 /**
  * 音效设置面板组件
  */
-import { memo, useState, useEffect, useCallback } from 'react'
+import { memo, useState, useCallback } from 'react'
 import { useSound } from '../hooks/useSound'
 
 interface SoundSettingsProps {

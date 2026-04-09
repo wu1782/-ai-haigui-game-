@@ -131,7 +131,7 @@ export function AchievementToast({ achievementId, onDismiss, autoDismissMs = 500
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-amber-100 text-xs font-medium">🏆 成就解锁</span>
-                  {achievement.gold && (
+                  {'gold' in achievement && achievement.gold && (
                     <span className="px-2 py-0.5 text-[10px] bg-yellow-400/30 text-yellow-200 rounded-full font-bold">
                       金
                     </span>

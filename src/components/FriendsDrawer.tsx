@@ -189,7 +189,7 @@ export default function FriendsDrawer({ isOpen, onClose }: Props) {
     setSearchLoading(true)
     try {
       const results = await searchUsers(keyword)
-      setSearchResults(results)
+      setSearchResults(results.results)
     } catch (error) {
       console.error('搜索失败:', error)
     } finally {
