@@ -49,9 +49,19 @@ const API_PREFIX = `/api/${API_VERSION}`;
 
 // Create HTTP server and Socket.IO server
 const httpServer = createServer(app);
-const CORS_ORIGINS = process.env.CORS_ORIGINS
-  ? process.env.CORS_ORIGINS.split(',')
-  : ['http://localhost:5173', 'http://localhost:3000'];
+const DEFAULT_CORS_ORIGINS = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://*.vercel.app',
+  'https://ai-haigui-game-sigma.vercel.app'
+];
+
+const ENV_CORS_ORIGINS = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim()).filter(Boolean)
+  : [];
+
+// Merge env + defaults to avoid production misconfiguration accidentally blocking frontend
+const CORS_ORIGINS = Array.from(new Set([...DEFAULT_CORS_ORIGINS, ...ENV_CORS_ORIGINS]));
 
 // CORS origin validator with wildcard support
 const corsOriginValidator = (origin, callback) => {
@@ -95,15 +105,21 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false
 }));
 
-// CORS configuration with preflight handling
-app.use(cors({
+const corsOptions = {
   origin: corsOriginValidator,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
   exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'X-Request-Id'],
-  maxAge: 86400
-}));
+  maxAge: 86400,
+  optionsSuccessStatus: 204
+};
+
+// CORS configuration with preflight handling
+app.use(cors(corsOptions));
+
+// Explicitly handle CORS preflight for all routes
+app.options('*', cors(corsOptions));
 
 // Middleware with size limits
 app.use(express.json({ limit: '10mb' }));
